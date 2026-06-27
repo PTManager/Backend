@@ -4,3 +4,6 @@ out/
 *.iml
 .idea/
 !gradle/wrapper/gradle-wrapper.jar
+
+# 머신별 로컬 설정 (SDK 경로 등) — 저장소에 올리지 않는다
+local.properties
