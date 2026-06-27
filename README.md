@@ -35,10 +35,39 @@
 
 ## 실행
 
-JDK 21이 필요하다. (Android Studio의 번들 JBR로 빌드 가능.)
+JDK 21이 필요하다. `./gradlew`는 `JAVA_HOME`이 가리키는 JDK로 실행되므로 먼저 설정해야 한다.
+별도 JDK가 없으면 Android Studio 번들 JBR(`<AndroidStudio>/jbr`)을 그대로 써도 된다.
+
+### JAVA_HOME 설정
+
+> 경로 예시는 Android Studio 번들 JBR 기준이다. 설치 위치에 맞게 바꾼다.
+> (예: `D:\Program Files\Android\Android Studio\jbr`)
+
+**PowerShell — 현재 창에서만:**
+```powershell
+$env:JAVA_HOME = "D:\Program Files\Android\Android Studio\jbr"
+```
+
+**Git Bash — 현재 창에서만:**
+```bash
+export JAVA_HOME="D:/Program Files/Android/Android Studio/jbr"
+```
+
+**영구 설정 (새 터미널부터 적용):**
+```powershell
+setx JAVA_HOME "D:\Program Files\Android\Android Studio\jbr"
+```
+
+설정 확인:
+```bash
+java -version          # JAVA_HOME 적용 여부와 별개로 PATH의 java
+"$JAVA_HOME/bin/java" -version   # Git Bash
+```
+
+### 실행
 
 ```bash
-./gradlew bootRun
+./gradlew bootRun        # PowerShell에서는 .\gradlew bootRun
 ```
 
 | 환경 | URL |
