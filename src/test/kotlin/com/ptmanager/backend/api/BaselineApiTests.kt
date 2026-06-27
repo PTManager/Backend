@@ -45,6 +45,13 @@ class BaselineApiTests {
     }
 
     @Test
+    fun openApiDocIsServed() {
+        mockMvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.info.title", `is`("PTManager API")))
+    }
+
+    @Test
     fun createSwapRequestReturnsPendingStatus() {
         mockMvc.perform(
             post("/api/swap-requests")
