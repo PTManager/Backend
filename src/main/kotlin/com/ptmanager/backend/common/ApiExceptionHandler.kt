@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.util.NoSuchElementException
 
@@ -20,6 +21,14 @@ class ApiExceptionHandler {
     fun handleBadRequest(exception: IllegalArgumentException): ResponseEntity<ApiError> =
         ResponseEntity.badRequest()
             .body(ApiError("BAD_REQUEST", exception.message, Instant.now(), emptyMap()))
+
+    @ExceptionHandler(ResponseStatusException::class)
+    fun handleResponseStatus(exception: ResponseStatusException): ResponseEntity<ApiError> {
+        val status = exception.statusCode
+        val code = (status as? HttpStatus)?.name ?: status.toString()
+        return ResponseEntity.status(status)
+            .body(ApiError(code, exception.reason, Instant.now(), emptyMap()))
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidation(exception: MethodArgumentNotValidException): ResponseEntity<ApiError> {

@@ -19,8 +19,8 @@ class JoinRequestService(
     private val notificationService: NotificationService,
 ) {
 
-    fun findByWorkplace(workplaceId: Long): List<JoinRequest> =
-        joinRequestRepository.findByWorkplaceIdOrderByCreatedAtDesc(workplaceId)
+    fun findByWorkplace(workplaceId: Long, status: JoinRequestStatus): List<JoinRequest> =
+        joinRequestRepository.findByWorkplaceIdAndStatusOrderByCreatedAtDesc(workplaceId, status)
 
     @Transactional
     fun create(inviteCode: String, userId: Long): JoinRequest {

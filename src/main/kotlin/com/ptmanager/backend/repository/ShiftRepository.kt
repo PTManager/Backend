@@ -8,5 +8,7 @@ interface ShiftRepository : JpaRepository<Shift, Long> {
 
     fun findByEmployeeIdOrderByWorkDateAscStartTimeAsc(employeeId: Long): List<Shift>
 
+    fun findByWorkplaceIdOrderByWorkDateAscStartTimeAsc(workplaceId: Long): List<Shift>
+
     fun findByWorkplaceIdAndWorkDateBetween(workplaceId: Long, from: LocalDate, to: LocalDate): List<Shift>
 }

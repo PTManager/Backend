@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface NoticeRepository : JpaRepository<Notice, Long> {
 
     fun findByWorkplaceIdOrderByCreatedAtDesc(workplaceId: Long): List<Notice>
+
+    fun findFirstByWorkplaceIdOrderByCreatedAtDesc(workplaceId: Long): Notice?
 }

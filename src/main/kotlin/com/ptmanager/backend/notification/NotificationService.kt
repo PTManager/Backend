@@ -12,8 +12,15 @@ class NotificationService(
     private val notificationRepository: NotificationRepository,
 ) {
 
-    fun findByUser(userId: Long): List<Notification> =
-        notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
+    fun findByUser(userId: Long, isRead: Boolean?): List<Notification> =
+        if (isRead == null) {
+            notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
+        } else {
+            notificationRepository.findByUserIdAndReadOrderByCreatedAtDesc(userId, isRead)
+        }
+
+    fun unreadCount(userId: Long): Long =
+        notificationRepository.countByUserIdAndReadFalse(userId)
 
     @Transactional
     fun notify(userId: Long, type: NotificationType, message: String): Notification {
@@ -27,10 +34,17 @@ class NotificationService(
     }
 
     @Transactional
-    fun markRead(id: Long): Notification {
+    fun markRead(id: Long) {
         val notification = notificationRepository.findById(id)
             .orElseThrow { NoSuchElementException("Notification not found.") }
         notification.read = true
-        return notificationRepository.save(notification)
+        notificationRepository.save(notification)
+    }
+
+    @Transactional
+    fun markAllRead(userId: Long) {
+        val unread = notificationRepository.findByUserIdAndReadOrderByCreatedAtDesc(userId, false)
+        unread.forEach { it.read = true }
+        notificationRepository.saveAll(unread)
     }
 }

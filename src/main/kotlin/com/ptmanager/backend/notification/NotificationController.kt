@@ -1,11 +1,17 @@
 package com.ptmanager.backend.notification
 
+import com.ptmanager.backend.common.dto.PageResponse
 import com.ptmanager.backend.domain.Notification
+import com.ptmanager.backend.notification.dto.UnreadCount
+import org.springframework.http.HttpStatus
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
@@ -15,9 +21,29 @@ class NotificationController(
 ) {
 
     @GetMapping
-    fun findNotifications(@RequestParam userId: Long): List<Notification> =
-        notificationService.findByUser(userId)
+    fun findNotifications(
+        @AuthenticationPrincipal userId: Long,
+        @RequestParam(required = false) isRead: Boolean?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+    ): PageResponse<Notification> {
+        val all = notificationService.findByUser(userId, isRead)
+        val fromIndex = (page * size).coerceIn(0, all.size)
+        val toIndex = (fromIndex + size).coerceIn(0, all.size)
+        val content = all.subList(fromIndex, toIndex)
+        val totalPages = if (size == 0) 0 else ((all.size + size - 1) / size)
+        return PageResponse(content, page, size, all.size.toLong(), totalPages)
+    }
 
-    @PatchMapping("/{id}/read")
-    fun markRead(@PathVariable id: Long): Notification = notificationService.markRead(id)
+    @GetMapping("/unread-count")
+    fun unreadCount(@AuthenticationPrincipal userId: Long): UnreadCount =
+        UnreadCount(notificationService.unreadCount(userId))
+
+    @PatchMapping("/{notificationId}/read")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun markRead(@PathVariable notificationId: Long) = notificationService.markRead(notificationId)
+
+    @PostMapping("/read-all")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun markAllRead(@AuthenticationPrincipal userId: Long) = notificationService.markAllRead(userId)
 }

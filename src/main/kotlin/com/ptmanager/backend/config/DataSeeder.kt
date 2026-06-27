@@ -8,6 +8,7 @@ import com.ptmanager.backend.repository.ShiftRepository
 import com.ptmanager.backend.repository.UserRepository
 import com.ptmanager.backend.repository.WorkplaceRepository
 import org.springframework.boot.CommandLineRunner
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.LocalTime
@@ -17,6 +18,7 @@ class DataSeeder(
     private val workplaceRepository: WorkplaceRepository,
     private val userRepository: UserRepository,
     private val shiftRepository: ShiftRepository,
+    private val passwordEncoder: PasswordEncoder,
 ) : CommandLineRunner {
 
     override fun run(vararg args: String?) {
@@ -31,7 +33,7 @@ class DataSeeder(
         val employee = userRepository.save(
             User(
                 email = "employee@ptmanager.test",
-                password = "password",
+                password = passwordEncoder.encode("password"),
                 name = "Kim Employee",
                 role = UserRole.EMPLOYEE,
                 workplaceId = workplace.id,
@@ -41,7 +43,7 @@ class DataSeeder(
         userRepository.save(
             User(
                 email = "employer@ptmanager.test",
-                password = "password",
+                password = passwordEncoder.encode("password"),
                 name = "Park Employer",
                 role = UserRole.EMPLOYER,
                 workplaceId = workplace.id,
