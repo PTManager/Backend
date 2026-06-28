@@ -9,7 +9,7 @@
 
 도메인 컨트롤러는 Auth · Workplace · User · Shift · SwapRequest · Notice · Notification · Payroll · Health 로 분리되며, 공통 `ApiExceptionHandler`로 일관된 에러 응답을 제공한다.
 
-> OpenAPI 3.0.3 / 총 **43개 엔드포인트**. 본 문서는 Swagger(SpringDoc) 명세와 동기화되는 기준 문서이며, 서버·클라이언트가 이 명세를 기준으로 병렬 개발한다.
+> OpenAPI 3.0.3 / 총 **44개 엔드포인트**. 본 문서는 Swagger(SpringDoc) 명세와 동기화되는 기준 문서이며, 서버·클라이언트가 이 명세를 기준으로 병렬 개발한다. 실제 동작 명세는 서버 구동 후 라이브 Swagger(`/swagger-ui.html`)가 단일 진실 소스다.
 
 ---
 
@@ -162,6 +162,12 @@ EMPLOYER가 매장을 생성한다. 생성 시 직원 가입용 `inviteCode`가 
 요청 (`DecisionRequest`) `{ "decision": "APPROVE" }` (`APPROVE` \| `REJECT`)
 
 응답 `200 OK` — `JoinRequest`. 오류: `403`, `404`, `409`(이미 처리됨).
+
+### 2.7 매장 QR 출근 토큰 발급 (사장) — `GET /api/workplaces/{workplaceId}/qr-token`
+
+QR 출근 체크(`POST /api/shifts/{shiftId}/check-in`)가 검증할 **서명된 토큰을 발급**한다. 사장이 매장에 게시할 QR 토큰을 발급한다. 토큰은 `wp{workplaceId}:{epochSeconds}:{HMAC-SHA256 서명}` 형식이며 **서버에 저장되지 않는다**(검증 시 서명 재계산). 직원 앱은 이 토큰을 QR로 스캔해 출근 체크에 사용한다.
+
+응답 `200 OK` — `QrTokenResponse` `{ "qrToken": "wp1:1719740400:9f8a..." }`. 오류: `403`(사장 아님 / 타 매장).
 
 ---
 
@@ -496,7 +502,7 @@ EMPLOYER가 매장을 생성한다. 생성 시 직원 가입용 `inviteCode`가 
 
 ---
 
-## 엔드포인트 요약 (43개)
+## 엔드포인트 요약 (44개)
 
 | # | Method | Path | 태그 | 설명 | 성공 |
 | --- | --- | --- | --- | --- | --- |
@@ -511,39 +517,42 @@ EMPLOYER가 매장을 생성한다. 생성 시 직원 가입용 `inviteCode`가 
 | 9 | POST | `/api/join-requests` | Workplace | 가입 신청(직원) | 201 |
 | 10 | GET | `/api/join-requests` | Workplace | 가입 신청 목록(사장) | 200 |
 | 11 | PATCH | `/api/join-requests/{joinRequestId}` | Workplace | 가입 승인/거절(사장) | 200 |
-| 12 | PATCH | `/api/users/me` | User | 프로필 수정 | 200 |
-| 13 | GET | `/api/users/me/notification-setting` | User | 알림 설정 조회 | 200 |
-| 14 | PATCH | `/api/users/me/notification-setting` | User | 알림 설정 수정 | 200 |
-| 15 | POST | `/api/users/me/device-tokens` | User | FCM 토큰 등록 | 201 |
-| 16 | DELETE | `/api/users/me/device-tokens/{token}` | User | FCM 토큰 삭제 | 204 |
-| 17 | GET | `/api/shifts` | Shift | 근무 목록 | 200 |
-| 18 | POST | `/api/shifts` | Shift | 근무 편성(사장) | 201 |
-| 19 | GET | `/api/shifts/{shiftId}` | Shift | 근무 상세 | 200 |
-| 20 | PATCH | `/api/shifts/{shiftId}` | Shift | 근무 수정(사장) | 200 |
-| 21 | DELETE | `/api/shifts/{shiftId}` | Shift | 근무 삭제(사장) | 204 |
-| 22 | POST | `/api/shifts/{shiftId}/check-in` | Shift | QR 출근 체크(직원) | 200 |
-| 23 | POST | `/api/swap-requests` | SwapRequest | 대타 요청 생성(직원) | 201 |
-| 24 | GET | `/api/swap-requests` | SwapRequest | 대타 요청 목록 | 200 |
-| 25 | GET | `/api/swap-requests/{swapRequestId}` | SwapRequest | 대타 요청 상세 | 200 |
-| 26 | POST | `/api/swap-requests/{swapRequestId}/applications` | SwapRequest | 대타 지원(직원) | 201 |
-| 27 | GET | `/api/swap-requests/{swapRequestId}/applications` | SwapRequest | 지원자 목록(사장) | 200 |
-| 28 | POST | `/api/swap-requests/{swapRequestId}/approve` | SwapRequest | 대타 승인(사장) | 200 |
-| 29 | POST | `/api/swap-requests/{swapRequestId}/reject` | SwapRequest | 대타 거절(사장) | 200 |
-| 30 | GET | `/api/swap-applications/me` | SwapRequest | 내 지원 내역(직원) | 200 |
-| 31 | GET | `/api/notices` | Notice | 공지 피드 | 200 |
-| 32 | POST | `/api/notices` | Notice | 공지 작성(사장) | 201 |
-| 33 | GET | `/api/notices/{noticeId}` | Notice | 공지 상세 | 200 |
-| 34 | DELETE | `/api/notices/{noticeId}` | Notice | 공지 삭제(사장) | 204 |
-| 35 | POST | `/api/notices/attachments` | Notice | 첨부 업로드 | 201 |
-| 36 | GET | `/api/notices/unread` | Notice | 미확인 공지(레드 닷) | 200 |
-| 37 | POST | `/api/notices/read` | Notice | 공지 읽음 처리 | 204 |
-| 38 | GET | `/api/notifications` | Notification | 알림 인박스 | 200 |
-| 39 | GET | `/api/notifications/unread-count` | Notification | 안 읽은 알림 수 | 200 |
-| 40 | PATCH | `/api/notifications/{notificationId}/read` | Notification | 알림 읽음 | 204 |
-| 41 | POST | `/api/notifications/read-all` | Notification | 전체 읽음 | 204 |
-| 42 | GET | `/api/payroll` | Payroll | 인건비 집계(사장) | 200 |
-| 43 | GET | `/api/health` | Health | 헬스 체크 🔓 | 200 |
+| 12 | GET | `/api/workplaces/{workplaceId}/qr-token` | Workplace | QR 출근 토큰 발급(사장) | 200 |
+| 13 | PATCH | `/api/users/me` | User | 프로필 수정 | 200 |
+| 14 | GET | `/api/users/me/notification-setting` | User | 알림 설정 조회 | 200 |
+| 15 | PATCH | `/api/users/me/notification-setting` | User | 알림 설정 수정 | 200 |
+| 16 | POST | `/api/users/me/device-tokens` | User | FCM 토큰 등록 | 201 |
+| 17 | DELETE | `/api/users/me/device-tokens/{token}` | User | FCM 토큰 삭제 | 204 |
+| 18 | GET | `/api/shifts` | Shift | 근무 목록 | 200 |
+| 19 | POST | `/api/shifts` | Shift | 근무 편성(사장) | 201 |
+| 20 | GET | `/api/shifts/{shiftId}` | Shift | 근무 상세 | 200 |
+| 21 | PATCH | `/api/shifts/{shiftId}` | Shift | 근무 수정(사장) | 200 |
+| 22 | DELETE | `/api/shifts/{shiftId}` | Shift | 근무 삭제(사장) | 204 |
+| 23 | POST | `/api/shifts/{shiftId}/check-in` | Shift | QR 출근 체크(직원) | 200 |
+| 24 | POST | `/api/swap-requests` | SwapRequest | 대타 요청 생성(직원) | 201 |
+| 25 | GET | `/api/swap-requests` | SwapRequest | 대타 요청 목록 | 200 |
+| 26 | GET | `/api/swap-requests/{swapRequestId}` | SwapRequest | 대타 요청 상세 | 200 |
+| 27 | POST | `/api/swap-requests/{swapRequestId}/applications` | SwapRequest | 대타 지원(직원) | 201 |
+| 28 | GET | `/api/swap-requests/{swapRequestId}/applications` | SwapRequest | 지원자 목록(사장) | 200 |
+| 29 | POST | `/api/swap-requests/{swapRequestId}/approve` | SwapRequest | 대타 승인(사장) | 200 |
+| 30 | POST | `/api/swap-requests/{swapRequestId}/reject` | SwapRequest | 대타 거절(사장) | 200 |
+| 31 | GET | `/api/swap-applications/me` | SwapRequest | 내 지원 내역(직원) | 200 |
+| 32 | GET | `/api/notices` | Notice | 공지 피드 | 200 |
+| 33 | POST | `/api/notices` | Notice | 공지 작성(사장) | 201 |
+| 34 | GET | `/api/notices/{noticeId}` | Notice | 공지 상세 | 200 |
+| 35 | DELETE | `/api/notices/{noticeId}` | Notice | 공지 삭제(사장) | 204 |
+| 36 | POST | `/api/notices/attachments` | Notice | 첨부 업로드 | 201 |
+| 37 | GET | `/api/notices/unread` | Notice | 미확인 공지(레드 닷) | 200 |
+| 38 | POST | `/api/notices/read` | Notice | 공지 읽음 처리 | 204 |
+| 39 | GET | `/api/notifications` | Notification | 알림 인박스 | 200 |
+| 40 | GET | `/api/notifications/unread-count` | Notification | 안 읽은 알림 수 | 200 |
+| 41 | PATCH | `/api/notifications/{notificationId}/read` | Notification | 알림 읽음 | 204 |
+| 42 | POST | `/api/notifications/read-all` | Notification | 전체 읽음 | 204 |
+| 43 | GET | `/api/payroll` | Payroll | 인건비 집계(사장) | 200 |
+| 44 | GET | `/api/health` | Health | 헬스 체크 🔓 | 200 |
 
 > 🔓 = 인증 불필요(공개). 그 외 모든 엔드포인트는 `Authorization: Bearer {token}` 필요.
 >
-> **참고:** 본 문서는 PTManager의 *목표(target) API 명세*다. 현재 백엔드 코드는 MVP 초기 단계로 일부 엔드포인트(JWT 인증/리프레시, 회원가입, 대타 지원·승인 분리, 페이지네이션, FCM 토큰, 공지 첨부/읽음, 알림 배지, Payroll 등)를 아직 구현하지 않았다. 데이터 모델 상세는 [ERD.md](ERD.md) 참고.
+> **참고:** 모든 엔드포인트가 구현되었고, JWT 인증·RBAC·매장 단위 테넌트 격리·알림 fan-out·서명 QR 출근까지 동작한다. 일부 외부 연동은 스텁이다: **FCM 푸시**(로그 스텁), **S3 첨부 업로드**(스텁). 실제 동작 명세는 라이브 Swagger를 기준으로 하며, 데이터 모델 상세는 [ERD.md](ERD.md) 참고.
+>
+> **QR 토큰은 저장하지 않는다** — HMAC 서명 방식이라 별도 테이블 없이 검증한다.
