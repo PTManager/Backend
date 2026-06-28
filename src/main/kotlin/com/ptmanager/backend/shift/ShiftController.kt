@@ -1,9 +1,9 @@
 package com.ptmanager.backend.shift
 
 import com.ptmanager.backend.domain.AttendanceStatus
-import com.ptmanager.backend.domain.Shift
 import com.ptmanager.backend.shift.dto.CheckInRequest
 import com.ptmanager.backend.shift.dto.CreateShiftRequest
+import com.ptmanager.backend.shift.dto.ShiftResponse
 import com.ptmanager.backend.shift.dto.UpdateShiftRequest
 import jakarta.validation.Valid
 import org.springframework.format.annotation.DateTimeFormat
@@ -36,7 +36,7 @@ class ShiftController(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) from: LocalDate?,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) to: LocalDate?,
         @RequestParam(required = false) status: AttendanceStatus?,
-    ): List<Shift> {
+    ): List<ShiftResponse> {
         val resolvedEmployeeId = when (employeeId) {
             null -> null
             "me" -> userId
@@ -48,7 +48,7 @@ class ShiftController(
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('EMPLOYER')")
-    fun createShift(@Valid @RequestBody request: CreateShiftRequest): Shift =
+    fun createShift(@Valid @RequestBody request: CreateShiftRequest): ShiftResponse =
         shiftService.create(
             request.workplaceId,
             request.employeeId,
@@ -58,14 +58,14 @@ class ShiftController(
         )
 
     @GetMapping("/{shiftId}")
-    fun getShift(@PathVariable shiftId: Long): Shift = shiftService.getShift(shiftId)
+    fun getShift(@PathVariable shiftId: Long): ShiftResponse = shiftService.getShiftDetail(shiftId)
 
     @PatchMapping("/{shiftId}")
     @PreAuthorize("hasRole('EMPLOYER')")
     fun updateShift(
         @PathVariable shiftId: Long,
         @RequestBody request: UpdateShiftRequest,
-    ): Shift = shiftService.update(
+    ): ShiftResponse = shiftService.update(
         shiftId,
         request.employeeId,
         request.workDate,
@@ -83,5 +83,5 @@ class ShiftController(
         @AuthenticationPrincipal userId: Long,
         @PathVariable shiftId: Long,
         @Valid @RequestBody request: CheckInRequest,
-    ): Shift = shiftService.checkIn(shiftId, userId, request.qrToken)
+    ): ShiftResponse = shiftService.checkIn(shiftId, userId, request.qrToken)
 }

@@ -4,9 +4,12 @@ import com.ptmanager.backend.common.access.WorkplaceAccessGuard
 import com.ptmanager.backend.domain.AttendanceStatus
 import com.ptmanager.backend.domain.NotificationType
 import com.ptmanager.backend.domain.Shift
+import com.ptmanager.backend.domain.SwapRequestStatus
 import com.ptmanager.backend.notification.NotificationService
 import com.ptmanager.backend.repository.ShiftRepository
+import com.ptmanager.backend.repository.SwapRequestRepository
 import com.ptmanager.backend.repository.UserRepository
+import com.ptmanager.backend.shift.dto.ShiftResponse
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -21,6 +24,7 @@ import java.util.NoSuchElementException
 class ShiftService(
     private val shiftRepository: ShiftRepository,
     private val userRepository: UserRepository,
+    private val swapRequestRepository: SwapRequestRepository,
     private val notificationService: NotificationService,
     private val accessGuard: WorkplaceAccessGuard,
     private val qrCodeService: QrCodeService,
@@ -32,7 +36,7 @@ class ShiftService(
         from: LocalDate?,
         to: LocalDate?,
         status: AttendanceStatus?,
-    ): List<Shift> {
+    ): List<ShiftResponse> {
         if (workplaceId != null) {
             accessGuard.requireMemberOf(workplaceId)
         }
@@ -53,14 +57,16 @@ class ShiftService(
                 shiftRepository.findByWorkplaceIdOrderByWorkDateAscStartTimeAsc(workplaceId)
             else -> emptyList()
         }
-        return if (status == null) base else base.filter { it.attendanceStatus == status }
+        val shifts = if (status == null) base else base.filter { it.attendanceStatus == status }
+
+        val names = userRepository.findAllById(shifts.map { it.employeeId }.distinct())
+            .associate { it.id to it.name }
+        return shifts.map { toResponse(it, names[it.employeeId]) }
     }
 
-    fun getShift(id: Long): Shift {
-        val shift = shiftRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Shift not found.") }
-        accessGuard.requireMemberOf(shift.workplaceId)
-        return shift
+    fun getShiftDetail(id: Long): ShiftResponse {
+        val shift = getShift(id)
+        return toResponse(shift, employeeNameOf(shift.employeeId))
     }
 
     @Transactional
@@ -70,8 +76,9 @@ class ShiftService(
         workDate: LocalDate,
         startTime: LocalTime,
         endTime: LocalTime,
-    ): Shift {
+    ): ShiftResponse {
         accessGuard.requireMemberOf(workplaceId)
+        requireEmployeeInWorkplace(employeeId, workplaceId)
         val shift = shiftRepository.save(
             Shift(
                 workplaceId = workplaceId,
@@ -82,7 +89,7 @@ class ShiftService(
             ),
         )
         notifyScheduleChanged(shift, "새 근무가 편성되었습니다.")
-        return shift
+        return toResponse(shift, employeeNameOf(employeeId))
     }
 
     @Transactional
@@ -92,31 +99,40 @@ class ShiftService(
         workDate: LocalDate?,
         startTime: LocalTime?,
         endTime: LocalTime?,
-    ): Shift {
+    ): ShiftResponse {
         val shift = getShift(id)
-        employeeId?.let { shift.employeeId = it }
+        employeeId?.let {
+            requireEmployeeInWorkplace(it, shift.workplaceId)
+            shift.employeeId = it
+        }
         workDate?.let { shift.workDate = it }
         startTime?.let { shift.startTime = it }
         endTime?.let { shift.endTime = it }
         val saved = shiftRepository.save(shift)
         notifyScheduleChanged(saved, "근무 편성이 변경되었습니다.")
-        return saved
+        return toResponse(saved, employeeNameOf(saved.employeeId))
     }
 
     @Transactional
     fun delete(id: Long) {
         val shift = getShift(id)
+        // 열린(PENDING) 대타 요청이 걸린 근무는 삭제할 수 없다. (ERD: ON DELETE RESTRICT)
+        if (swapRequestRepository.existsByShiftIdAndStatus(shift.id!!, SwapRequestStatus.PENDING)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "대타 요청이 걸려 있어 삭제할 수 없습니다.")
+        }
         shiftRepository.delete(shift)
     }
 
     @Transactional
-    fun checkIn(shiftId: Long, currentUserId: Long, qrToken: String): Shift {
+    fun checkIn(shiftId: Long, currentUserId: Long, qrToken: String): ShiftResponse {
         val shift = getShift(shiftId)
         if (shift.employeeId != currentUserId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인 근무만 출근 체크할 수 있습니다.")
         }
         qrCodeService.verify(shift.workplaceId, qrToken)
-        require(shift.checkedInAt == null) { "이미 출근 처리된 근무입니다." }
+        if (shift.checkedInAt != null) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "이미 출근 처리된 근무입니다.")
+        }
 
         val now = Instant.now()
         shift.checkedInAt = now
@@ -127,8 +143,27 @@ class ShiftService(
         shift.attendanceStatus =
             if (now.isAfter(scheduledStart)) AttendanceStatus.LATE else AttendanceStatus.PRESENT
 
-        return shiftRepository.save(shift)
+        val saved = shiftRepository.save(shift)
+        return toResponse(saved, employeeNameOf(saved.employeeId))
     }
+
+    private fun getShift(id: Long): Shift {
+        val shift = shiftRepository.findById(id)
+            .orElseThrow { NoSuchElementException("Shift not found.") }
+        accessGuard.requireMemberOf(shift.workplaceId)
+        return shift
+    }
+
+    private fun requireEmployeeInWorkplace(employeeId: Long, workplaceId: Long) {
+        val employee = userRepository.findById(employeeId)
+            .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "직원을 찾을 수 없습니다.") }
+        if (employee.workplaceId != workplaceId) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 매장 소속 직원이 아닙니다.")
+        }
+    }
+
+    private fun employeeNameOf(employeeId: Long): String? =
+        userRepository.findById(employeeId).orElse(null)?.name
 
     private fun notifyScheduleChanged(shift: Shift, message: String) {
         notificationService.notify(
@@ -139,4 +174,19 @@ class ShiftService(
             targetId = shift.id,
         )
     }
+
+    private fun toResponse(shift: Shift, employeeName: String?): ShiftResponse =
+        ShiftResponse(
+            id = shift.id,
+            workplaceId = shift.workplaceId,
+            employeeId = shift.employeeId,
+            employeeName = employeeName,
+            workDate = shift.workDate,
+            startTime = shift.startTime,
+            endTime = shift.endTime,
+            checkedInAt = shift.checkedInAt,
+            attendanceStatus = shift.attendanceStatus,
+            createdAt = shift.createdAt,
+            updatedAt = shift.updatedAt,
+        )
 }

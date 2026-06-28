@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -302,6 +303,25 @@ class BaselineApiTests {
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.checkedInAt").exists())
+            .andExpect(jsonPath("$.employeeName", `is`("Kim Employee")))
+    }
+
+    @Test
+    fun cannotDeleteShiftWithPendingSwap() {
+        // 직원이 shift 2 에 대타 요청(PENDING) 생성
+        val empToken = loginAs("employee@ptmanager.test")
+        mockMvc.perform(
+            post("/api/swap-requests")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $empToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"shiftId":2,"reason":"삭제 테스트"}"""),
+        ).andExpect(status().isCreated)
+
+        // 사장이 삭제 시도 → 409
+        val bossToken = loginAs("employer@ptmanager.test")
+        mockMvc.perform(
+            delete("/api/shifts/2").header(HttpHeaders.AUTHORIZATION, "Bearer $bossToken"),
+        ).andExpect(status().isConflict)
     }
 
     @Test
