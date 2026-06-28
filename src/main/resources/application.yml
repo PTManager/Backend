@@ -32,7 +32,21 @@ qr:
   secret: ${QR_SECRET:dev-only-qr-secret-please-override-in-production}
   # QR 토큰 허용 수명(초). 0 이하면 시간 검사를 생략하고 서명·매장만 검증한다.
   # (회전형 QR을 쓰면 양수로 설정해 만료를 강제)
-  max-age-seconds: 0
+  max-age-seconds: ${QR_MAX_AGE_SECONDS:0}
+
+fcm:
+  # true 로 켜면 실제 FCM 발송(FcmPushSender). 기본은 로그 스텁(LoggingPushSender)
+  enabled: ${FCM_ENABLED:false}
+  # 서비스 계정 JSON 경로 (비우면 GOOGLE_APPLICATION_CREDENTIALS 사용)
+  credentials-path: ${FCM_CREDENTIALS_PATH:}
+
+s3:
+  # true 로 켜면 실제 S3 업로드(S3StorageService). 기본은 스텁(StubStorageService)
+  enabled: ${S3_ENABLED:false}
+  bucket: ${S3_BUCKET:}
+  region: ${S3_REGION:ap-northeast-2}
+  # 퍼블릭 접근 URL 베이스 (CloudFront 등). 비우면 기본 S3 URL 사용
+  public-base-url: ${S3_PUBLIC_BASE_URL:}
 
 management:
   endpoints:

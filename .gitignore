@@ -7,3 +7,19 @@ out/
 
 # 머신별 로컬 설정 (SDK 경로 등) — 저장소에 올리지 않는다
 local.properties
+
+# 로컬 환경변수 / 시크릿 — 절대 커밋 금지
+.env
+.env.*
+!.env.example
+
+# 로컬 전용 Spring 설정(시크릿 포함) — application-local.yml 등
+application-local.yml
+application-local.yaml
+application-secret.yml
+application-secret.yaml
+
+# 자격증명 키 파일 (FCM 서비스 계정, AWS 등)
+**/serviceAccount*.json
+**/firebase-adminsdk*.json
+*.pem

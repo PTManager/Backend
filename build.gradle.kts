@@ -29,6 +29,10 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
+    // 푸시(FCM)·파일 저장(S3) — 설정으로 활성화 시에만 사용, 기본은 스텁
+    implementation("com.google.firebase:firebase-admin:9.2.0")
+    implementation("software.amazon.awssdk:s3:2.27.21")
+
     runtimeOnly("com.h2database:h2")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
