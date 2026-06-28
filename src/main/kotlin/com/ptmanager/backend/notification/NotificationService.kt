@@ -71,9 +71,13 @@ class NotificationService(
     }
 
     @Transactional
-    fun markRead(id: Long) {
+    fun markRead(id: Long, userId: Long) {
         val notification = notificationRepository.findById(id)
             .orElseThrow { NoSuchElementException("Notification not found.") }
+        // 본인 알림이 아니면 존재 자체를 숨긴다(정보 노출 방지).
+        if (notification.userId != userId) {
+            throw NoSuchElementException("Notification not found.")
+        }
         notification.read = true
         notificationRepository.save(notification)
     }

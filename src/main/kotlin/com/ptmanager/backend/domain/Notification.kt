@@ -1,5 +1,6 @@
 package com.ptmanager.backend.domain
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -35,6 +36,7 @@ class Notification(
     @Column(name = "target_id")
     var targetId: Long? = null,
 
+    @get:JsonProperty("isRead")
     @Column(name = "is_read", nullable = false)
     var read: Boolean = false,
 

@@ -45,7 +45,10 @@ class NotificationController(
 
     @PatchMapping("/{notificationId}/read")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun markRead(@PathVariable notificationId: Long) = notificationService.markRead(notificationId)
+    fun markRead(
+        @AuthenticationPrincipal userId: Long,
+        @PathVariable notificationId: Long,
+    ) = notificationService.markRead(notificationId, userId)
 
     @PostMapping("/read-all")
     @ResponseStatus(HttpStatus.NO_CONTENT)

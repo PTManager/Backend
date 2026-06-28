@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -185,6 +186,76 @@ class BaselineApiTests {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.authorName", `is`("공지사장")))
             .andExpect(jsonPath("$.attachments[0].fileUrl", `is`("https://example.com/a.jpg")))
+    }
+
+    @Test
+    fun notificationInboxUsesIsReadAndIsOwnerScoped() {
+        // 사장 E 가입 + 매장 생성
+        val eSignup = mockMvc.perform(
+            post("/api/auth/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"notif-boss@ptmanager.test","password":"password1","name":"알림사장","role":"EMPLOYER"}"""),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val eToken: String = JsonPath.read(eSignup, "$.accessToken")
+
+        val workplace = mockMvc.perform(
+            post("/api/workplaces")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $eToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"알림 테스트 매장"}"""),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val inviteCode: String = JsonPath.read(workplace, "$.inviteCode")
+
+        // 직원 M 가입 + 가입 신청
+        val mSignup = mockMvc.perform(
+            post("/api/auth/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"notif-emp@ptmanager.test","password":"password1","name":"알림직원","role":"EMPLOYEE"}"""),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val mToken: String = JsonPath.read(mSignup, "$.accessToken")
+
+        val joinRequest = mockMvc.perform(
+            post("/api/join-requests")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $mToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"$inviteCode"}"""),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val joinRequestId: Int = JsonPath.read(joinRequest, "$.id")
+
+        // E 가 승인 → M 에게 JOIN_REQUEST 알림 생성
+        mockMvc.perform(
+            patch("/api/join-requests/$joinRequestId")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $eToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"decision":"APPROVE"}"""),
+        ).andExpect(status().isOk)
+
+        // M 인박스: 응답 필드가 isRead 인지 (read 아님) 확인
+        val inbox = mockMvc.perform(
+            get("/api/notifications").header(HttpHeaders.AUTHORIZATION, "Bearer $mToken"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.content[0].isRead", `is`(false)))
+            .andExpect(jsonPath("$.content[0].read").doesNotExist())
+            .andReturn().response.contentAsString
+        val notificationId: Int = JsonPath.read(inbox, "$.content[0].id")
+
+        // 소유권: E 가 M 의 알림을 읽음 처리 시도 → 404
+        mockMvc.perform(
+            patch("/api/notifications/$notificationId/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $eToken"),
+        ).andExpect(status().isNotFound)
+
+        // 본인(M)은 읽음 처리 가능 → 204, 이후 안 읽은 수 0
+        mockMvc.perform(
+            patch("/api/notifications/$notificationId/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $mToken"),
+        ).andExpect(status().isNoContent)
+        mockMvc.perform(
+            get("/api/notifications/unread-count").header(HttpHeaders.AUTHORIZATION, "Bearer $mToken"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.count", `is`(0)))
     }
 
     @Test
