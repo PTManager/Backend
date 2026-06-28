@@ -6,6 +6,7 @@ import com.ptmanager.backend.domain.NoticeAttachment
 import com.ptmanager.backend.notice.dto.CreateNoticeRequest
 import com.ptmanager.backend.notice.dto.UnreadFlag
 import jakarta.validation.Valid
+import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -32,12 +33,15 @@ class NoticeController(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): PageResponse<Notice> {
-        val all = noticeService.findByWorkplace(workplaceId)
-        val fromIndex = (page * size).coerceIn(0, all.size)
-        val toIndex = (fromIndex + size).coerceIn(0, all.size)
-        val content = all.subList(fromIndex, toIndex)
-        val totalPages = if (size == 0) 0 else ((all.size + size - 1) / size)
-        return PageResponse(content, page, size, all.size.toLong(), totalPages)
+        val pageable = PageRequest.of(page.coerceAtLeast(0), size.coerceIn(1, 100))
+        val result = noticeService.findByWorkplace(workplaceId, pageable)
+        return PageResponse(
+            result.content,
+            result.number,
+            result.size,
+            result.totalElements,
+            result.totalPages,
+        )
     }
 
     @PostMapping

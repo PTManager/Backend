@@ -27,6 +27,13 @@ jwt:
   access-token-expiration-ms: 3600000        # 1시간
   refresh-token-expiration-ms: 1209600000    # 14일
 
+qr:
+  # 매장 QR 출근 토큰 서명용 HMAC 키. 운영에서는 QR_SECRET 로 재정의할 것
+  secret: ${QR_SECRET:dev-only-qr-secret-please-override-in-production}
+  # QR 토큰 허용 수명(초). 0 이하면 시간 검사를 생략하고 서명·매장만 검증한다.
+  # (회전형 QR을 쓰면 양수로 설정해 만료를 강제)
+  max-age-seconds: 0
+
 management:
   endpoints:
     web:

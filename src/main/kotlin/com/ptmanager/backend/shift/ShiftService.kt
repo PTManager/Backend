@@ -23,6 +23,7 @@ class ShiftService(
     private val userRepository: UserRepository,
     private val notificationService: NotificationService,
     private val accessGuard: WorkplaceAccessGuard,
+    private val qrCodeService: QrCodeService,
 ) {
 
     fun findShifts(
@@ -114,7 +115,7 @@ class ShiftService(
         if (shift.employeeId != currentUserId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인 근무만 출근 체크할 수 있습니다.")
         }
-        validateQrToken(shift, qrToken)
+        qrCodeService.verify(shift.workplaceId, qrToken)
         require(shift.checkedInAt == null) { "이미 출근 처리된 근무입니다." }
 
         val now = Instant.now()
@@ -137,16 +138,5 @@ class ShiftService(
             targetType = "SHIFT",
             targetId = shift.id,
         )
-    }
-
-    /**
-     * 매장 QR 토큰 검증. 형식 `wp{workplaceId}:{epochSeconds}:{signature}`.
-     * 현재는 형식·매장 일치만 확인한다. (TODO: HMAC 서명 검증 + 시간 윈도우)
-     */
-    private fun validateQrToken(shift: Shift, qrToken: String) {
-        val parts = qrToken.split(":")
-        require(parts.size == 3 && parts[0] == "wp${shift.workplaceId}") {
-            "유효하지 않은 QR 토큰입니다."
-        }
     }
 }

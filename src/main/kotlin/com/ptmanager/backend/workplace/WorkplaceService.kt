@@ -6,6 +6,7 @@ import com.ptmanager.backend.domain.UserRole
 import com.ptmanager.backend.domain.Workplace
 import com.ptmanager.backend.repository.UserRepository
 import com.ptmanager.backend.repository.WorkplaceRepository
+import com.ptmanager.backend.shift.QrCodeService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.security.SecureRandom
@@ -16,7 +17,14 @@ class WorkplaceService(
     private val workplaceRepository: WorkplaceRepository,
     private val userRepository: UserRepository,
     private val accessGuard: WorkplaceAccessGuard,
+    private val qrCodeService: QrCodeService,
 ) {
+
+    /** 매장 QR 출근 토큰을 발급한다. (사장이 매장에 게시) */
+    fun issueQrToken(workplaceId: Long): String {
+        accessGuard.requireMemberOf(workplaceId)
+        return qrCodeService.issue(workplaceId)
+    }
 
     fun getWorkplace(id: Long): Workplace {
         accessGuard.requireMemberOf(id)

@@ -3,6 +3,7 @@ package com.ptmanager.backend.notification
 import com.ptmanager.backend.common.dto.PageResponse
 import com.ptmanager.backend.domain.Notification
 import com.ptmanager.backend.notification.dto.UnreadCount
+import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
@@ -27,12 +28,15 @@ class NotificationController(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): PageResponse<Notification> {
-        val all = notificationService.findByUser(userId, isRead)
-        val fromIndex = (page * size).coerceIn(0, all.size)
-        val toIndex = (fromIndex + size).coerceIn(0, all.size)
-        val content = all.subList(fromIndex, toIndex)
-        val totalPages = if (size == 0) 0 else ((all.size + size - 1) / size)
-        return PageResponse(content, page, size, all.size.toLong(), totalPages)
+        val pageable = PageRequest.of(page.coerceAtLeast(0), size.coerceIn(1, 100))
+        val result = notificationService.findByUser(userId, isRead, pageable)
+        return PageResponse(
+            result.content,
+            result.number,
+            result.size,
+            result.totalElements,
+            result.totalPages,
+        )
     }
 
     @GetMapping("/unread-count")

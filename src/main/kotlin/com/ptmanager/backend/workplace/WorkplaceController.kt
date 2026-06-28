@@ -4,6 +4,7 @@ import com.ptmanager.backend.domain.User
 import com.ptmanager.backend.domain.UserRole
 import com.ptmanager.backend.domain.Workplace
 import com.ptmanager.backend.workplace.dto.CreateWorkplaceRequest
+import com.ptmanager.backend.workplace.dto.QrTokenResponse
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
@@ -37,4 +38,9 @@ class WorkplaceController(
         @PathVariable workplaceId: Long,
         @RequestParam(required = false) role: UserRole?,
     ): List<User> = workplaceService.findMembers(workplaceId, role)
+
+    @GetMapping("/{workplaceId}/qr-token")
+    @PreAuthorize("hasRole('EMPLOYER')")
+    fun qrToken(@PathVariable workplaceId: Long): QrTokenResponse =
+        QrTokenResponse(workplaceService.issueQrToken(workplaceId))
 }

@@ -1,6 +1,7 @@
 package com.ptmanager.backend.api
 
 import com.jayway.jsonpath.JsonPath
+import com.ptmanager.backend.shift.QrCodeService
 import org.hamcrest.Matchers.`is`
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -20,6 +21,9 @@ class BaselineApiTests {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @Autowired
+    private lateinit var qrCodeService: QrCodeService
 
     private fun loginAs(email: String): String {
         val response = mockMvc.perform(
@@ -139,6 +143,32 @@ class BaselineApiTests {
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.inviteCode").exists())
+    }
+
+    @Test
+    fun checkInWithValidQrTokenSucceeds() {
+        val token = loginAs("employee@ptmanager.test")
+        val qrToken = qrCodeService.issue(1) // 매장 1의 QR
+        mockMvc.perform(
+            post("/api/shifts/1/check-in")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"qrToken":"$qrToken"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.checkedInAt").exists())
+    }
+
+    @Test
+    fun checkInWithForgedQrTokenIsRejected() {
+        val token = loginAs("employee@ptmanager.test")
+        mockMvc.perform(
+            post("/api/shifts/2/check-in")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"qrToken":"wp1:1719740400:deadbeef"}"""),
+        )
+            .andExpect(status().isBadRequest)
     }
 
     @Test

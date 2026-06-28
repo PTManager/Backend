@@ -9,6 +9,8 @@ import com.ptmanager.backend.repository.NoticeAttachmentRepository
 import com.ptmanager.backend.repository.NoticeRepository
 import com.ptmanager.backend.repository.UserRepository
 import com.ptmanager.backend.notification.NotificationService
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
@@ -25,9 +27,9 @@ class NoticeService(
     private val accessGuard: WorkplaceAccessGuard,
 ) {
 
-    fun findByWorkplace(workplaceId: Long): List<Notice> {
+    fun findByWorkplace(workplaceId: Long, pageable: Pageable): Page<Notice> {
         accessGuard.requireMemberOf(workplaceId)
-        return noticeRepository.findByWorkplaceIdOrderByCreatedAtDesc(workplaceId)
+        return noticeRepository.findByWorkplaceIdOrderByCreatedAtDesc(workplaceId, pageable)
     }
 
     fun findById(id: Long): Notice {
