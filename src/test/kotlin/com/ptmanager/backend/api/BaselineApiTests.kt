@@ -370,6 +370,56 @@ class BaselineApiTests {
     }
 
     @Test
+    fun joinRequestGuardsAndUserName() {
+        val (eToken, _) = signupReturning("join-boss@ptmanager.test", "사장", "EMPLOYER")
+        val (wId, invite) = createWorkplace(eToken, "가입 테스트 매장")
+        val (mToken, _) = signupReturning("join-emp@ptmanager.test", "조이너", "EMPLOYEE")
+
+        // 가입 신청 — 응답에 userName 포함
+        val jr = mockMvc.perform(
+            post("/api/join-requests")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $mToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"$invite"}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.userName", `is`("조이너")))
+            .andReturn().response.contentAsString
+        val joinId: Int = JsonPath.read(jr, "$.id")
+
+        // B: 중복 신청 → 409
+        mockMvc.perform(
+            post("/api/join-requests")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $mToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"$invite"}"""),
+        ).andExpect(status().isConflict)
+
+        // A: 목록에도 userName
+        mockMvc.perform(
+            get("/api/join-requests?workplaceId=$wId").header(HttpHeaders.AUTHORIZATION, "Bearer $eToken"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].userName", `is`("조이너")))
+
+        // 승인 → 200
+        mockMvc.perform(
+            patch("/api/join-requests/$joinId")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $eToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"decision":"APPROVE"}"""),
+        ).andExpect(status().isOk)
+
+        // C: 이미 처리된 신청 재처리 → 409
+        mockMvc.perform(
+            patch("/api/join-requests/$joinId")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $eToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"decision":"REJECT"}"""),
+        ).andExpect(status().isConflict)
+    }
+
+    @Test
     fun swapGuardsAndDetailShape() {
         val (eToken, _) = signupReturning("swap-boss@ptmanager.test", "사장", "EMPLOYER")
         val (wId, invite) = createWorkplace(eToken, "대타 테스트 매장")

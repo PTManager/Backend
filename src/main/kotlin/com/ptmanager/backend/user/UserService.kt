@@ -60,8 +60,10 @@ class UserService(
     fun deleteDeviceToken(userId: Long, token: String) {
         val deviceToken = deviceTokenRepository.findByToken(token)
             ?: throw NoSuchElementException("Device token not found.")
-        if (deviceToken.userId == userId) {
-            deviceTokenRepository.delete(deviceToken)
+        // 본인 토큰이 아니면 존재 자체를 숨긴다(404).
+        if (deviceToken.userId != userId) {
+            throw NoSuchElementException("Device token not found.")
         }
+        deviceTokenRepository.delete(deviceToken)
     }
 }
