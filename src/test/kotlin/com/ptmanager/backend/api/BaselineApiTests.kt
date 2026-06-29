@@ -115,6 +115,9 @@ class BaselineApiTests {
         mockMvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.info.title", `is`("PTManager API")))
+            // 전역 커스터마이저: ApiError 스키마 + 공통 에러 응답이 문서에 들어갔는지
+            .andExpect(jsonPath("$.components.schemas.ApiError").exists())
+            .andExpect(jsonPath("$.paths['/api/auth/me'].get.responses['401']").exists())
     }
 
     @Test
