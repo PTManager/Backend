@@ -1,0 +1,19 @@
+# 운영 프로파일. 구동: SPRING_PROFILES_ACTIVE=prod
+# 스키마는 Flyway(V1__init.sql)가 소유하며, JPA는 검증/생성하지 않는다(ddl-auto=none).
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}            # 예: jdbc:postgresql://<RDS엔드포인트>:5432/ptmanager
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+  h2:
+    console:
+      enabled: false

@@ -4,9 +4,11 @@ import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.MessagingErrorCode
 import com.google.firebase.messaging.MulticastMessage
 import com.google.firebase.messaging.Notification as FcmNotification
 import com.ptmanager.backend.domain.NotificationType
+import com.ptmanager.backend.repository.DeviceTokenRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -17,11 +19,13 @@ import java.io.FileInputStream
  * 실제 FCM 멀티캐스트 발송기. `fcm.enabled=true` 일 때만 활성화된다.
  * 서비스 계정 자격증명은 `fcm.credentials-path`(파일 경로) 또는
  * 환경변수 GOOGLE_APPLICATION_CREDENTIALS(애플리케이션 기본 자격증명)로 제공한다.
+ * 발송 결과에서 무효(UNREGISTERED/INVALID_ARGUMENT) 토큰은 DB에서 자동 정리한다.
  */
 @Service
 @ConditionalOnProperty(prefix = "fcm", name = ["enabled"], havingValue = "true")
 class FcmPushSender(
     @Value("\${fcm.credentials-path:}") credentialsPath: String,
+    private val deviceTokenRepository: DeviceTokenRepository,
 ) : PushSender {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -61,8 +65,23 @@ class FcmPushSender(
             .build()
 
         val response = FirebaseMessaging.getInstance().sendEachForMulticast(multicast)
-        if (response.failureCount > 0) {
-            log.warn("FCM 발송 일부 실패: {}/{} 성공", response.successCount, deviceTokens.size)
+        if (response.failureCount == 0) return
+
+        // 더 이상 유효하지 않은 토큰은 DB에서 제거한다.
+        val staleTokens = response.responses.mapIndexedNotNull { index, sendResponse ->
+            val errorCode = sendResponse.exception?.messagingErrorCode
+            if (!sendResponse.isSuccessful &&
+                (errorCode == MessagingErrorCode.UNREGISTERED || errorCode == MessagingErrorCode.INVALID_ARGUMENT)
+            ) {
+                deviceTokens[index]
+            } else {
+                null
+            }
         }
+        if (staleTokens.isNotEmpty()) {
+            deviceTokenRepository.deleteByTokenIn(staleTokens)
+            log.info("무효 FCM 토큰 {}건 정리", staleTokens.size)
+        }
+        log.warn("FCM 발송 일부 실패: {}/{} 성공", response.successCount, deviceTokens.size)
     }
 }

@@ -17,6 +17,10 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  # 로컬/테스트는 H2 + create-drop 이므로 Flyway 비활성.
+  # 운영(prod 프로파일)에서만 PostgreSQL + Flyway 마이그레이션을 사용한다.
+  flyway:
+    enabled: false
 
 server:
   port: 8080

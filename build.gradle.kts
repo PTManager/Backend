@@ -33,7 +33,12 @@ dependencies {
     implementation("com.google.firebase:firebase-admin:9.2.0")
     implementation("software.amazon.awssdk:s3:2.27.21")
 
+    // DB 마이그레이션(운영 PostgreSQL) — 로컬/테스트는 H2라 flyway.enabled=false
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
+
     runtimeOnly("com.h2database:h2")
+    runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
