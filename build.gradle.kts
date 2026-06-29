@@ -1,3 +1,5 @@
+import org.springframework.boot.gradle.tasks.bundling.BootJar
+
 plugins {
     kotlin("jvm") version "2.1.0"
     kotlin("plugin.spring") version "2.1.0"
@@ -54,4 +56,9 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+// 배포 jar 이름을 고정한다(CD 스크립트·systemd가 ptmanager.jar 를 참조).
+tasks.withType<BootJar> {
+    archiveFileName.set("ptmanager.jar")
 }
