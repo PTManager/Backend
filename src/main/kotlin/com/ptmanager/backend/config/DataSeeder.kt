@@ -8,11 +8,14 @@ import com.ptmanager.backend.repository.ShiftRepository
 import com.ptmanager.backend.repository.UserRepository
 import com.ptmanager.backend.repository.WorkplaceRepository
 import org.springframework.boot.CommandLineRunner
+import org.springframework.context.annotation.Profile
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.LocalTime
 
+// 운영(prod) 프로파일에서는 시드 계정을 넣지 않는다. (local/test 전용)
+@Profile("!prod")
 @Component
 class DataSeeder(
     private val workplaceRepository: WorkplaceRepository,
