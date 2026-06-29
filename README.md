@@ -74,12 +74,13 @@ java -version          # JAVA_HOME 적용 여부와 별개로 PATH의 java
 | --- | --- |
 | 로컬 | `http://localhost:8080` |
 | 안드로이드 에뮬레이터 | `http://10.0.2.2:8080` |
-| Swagger UI | `http://localhost:8080/swagger-ui.html` |
-| OpenAPI JSON | `http://localhost:8080/v3/api-docs` |
-| H2 콘솔 | `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:ptmanager`, 사용자 `sa`) |
+| Swagger UI (로컬) | `http://localhost:8080/swagger-ui.html` |
+| OpenAPI JSON (로컬) | `http://localhost:8080/v3/api-docs` |
+| **운영 Swagger** | `http://<ElasticIP>:8080/swagger-ui.html` (RDS PostgreSQL) — 로컬 브라우저에서 접속해 운영 API 테스트 |
+| H2 콘솔 (로컬) | `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:ptmanager`, 사용자 `sa`) |
 
-> Swagger UI에서 보호된 API를 테스트하려면 `POST /api/auth/login`으로 받은 `accessToken`을
-> 우측 상단 **Authorize**에 입력한다.
+> Swagger의 서버 URL은 "접속한 호스트" 기준이라, 로컬에서 열면 로컬을, 운영 주소로 열면 운영 서버를 테스트한다.
+> 보호된 API는 `POST /api/auth/login`으로 받은 `accessToken`을 우측 상단 **Authorize**에 입력하면 된다.
 
 ## 동작 확인
 
