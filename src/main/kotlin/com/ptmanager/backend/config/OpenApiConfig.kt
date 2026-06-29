@@ -6,7 +6,6 @@ import io.swagger.v3.oas.models.info.Contact
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.security.SecurityRequirement
 import io.swagger.v3.oas.models.security.SecurityScheme
-import io.swagger.v3.oas.models.servers.Server
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -27,12 +26,8 @@ class OpenApiConfig {
                     )
                     .contact(Contact().name("PTManager Team").email("team@ptmanager.app")),
             )
-            .servers(
-                listOf(
-                    Server().url("http://localhost:8080").description("로컬 개발 서버"),
-                    Server().url("https://api.ptmanager.app").description("운영 서버 (AWS EC2 + RDS)"),
-                ),
-            )
+            // 서버 URL은 하드코딩하지 않는다 → SpringDoc이 요청 호스트 기준으로 자동 설정.
+            // (로컬·EC2 어디서 열든 Swagger "Try it out"이 그 호스트로 요청을 보냄)
             .addSecurityItem(SecurityRequirement().addList(bearerScheme))
             .components(
                 Components().addSecuritySchemes(
