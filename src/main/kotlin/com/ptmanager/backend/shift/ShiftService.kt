@@ -186,17 +186,5 @@ class ShiftService(
     }
 
     private fun toResponse(shift: Shift, employeeName: String?): ShiftResponse =
-        ShiftResponse(
-            id = shift.id,
-            workplaceId = shift.workplaceId,
-            employeeId = shift.employeeId,
-            employeeName = employeeName,
-            workDate = shift.workDate,
-            startTime = shift.startTime,
-            endTime = shift.endTime,
-            checkedInAt = shift.checkedInAt,
-            attendanceStatus = shift.attendanceStatus,
-            createdAt = shift.createdAt,
-            updatedAt = shift.updatedAt,
-        )
+        ShiftResponse.from(shift, employeeName)
 }

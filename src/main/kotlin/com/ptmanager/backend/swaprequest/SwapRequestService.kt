@@ -243,19 +243,7 @@ class SwapRequestService(
     }
 
     private fun toShiftResponse(shift: Shift): ShiftResponse =
-        ShiftResponse(
-            id = shift.id,
-            workplaceId = shift.workplaceId,
-            employeeId = shift.employeeId,
-            employeeName = userRepository.findById(shift.employeeId).orElse(null)?.name,
-            workDate = shift.workDate,
-            startTime = shift.startTime,
-            endTime = shift.endTime,
-            checkedInAt = shift.checkedInAt,
-            attendanceStatus = shift.attendanceStatus,
-            createdAt = shift.createdAt,
-            updatedAt = shift.updatedAt,
-        )
+        ShiftResponse.from(shift, userRepository.findById(shift.employeeId).orElse(null)?.name)
 
     private fun toApplicationResponses(applications: List<SwapApplication>): List<SwapApplicationResponse> {
         val names = userRepository.findAllById(applications.map { it.applicantId }.distinct())
