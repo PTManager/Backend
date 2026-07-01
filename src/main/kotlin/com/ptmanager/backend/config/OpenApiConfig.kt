@@ -2,6 +2,7 @@ package com.ptmanager.backend.config
 
 import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
+import io.swagger.v3.oas.models.examples.Example
 import io.swagger.v3.oas.models.info.Contact
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.media.Content
@@ -80,6 +81,50 @@ class OpenApiConfig {
                 }
             }
         }
+    }
+
+    /**
+     * QR 출근 체크(`checkIn`)의 400 응답에 QrCodeService.verify()가 실제로 던지는
+     * 사유별 메시지를 예시로 붙인다. (형식·매장불일치·서명·만료·재사용)
+     */
+    @Bean
+    fun checkInQrErrorExamplesCustomizer(): OpenApiCustomizer = OpenApiCustomizer { openApi ->
+        val operation = openApi.paths?.values
+            ?.flatMap { it.readOperations() }
+            ?.firstOrNull { it.operationId == "checkIn" }
+            ?: return@OpenApiCustomizer
+
+        val examples = linkedMapOf(
+            "만료된 QR" to "만료된 QR 코드입니다.",
+            "이미 갱신된 QR (재사용)" to "이미 갱신된 QR 코드입니다. 최신 QR로 다시 스캔해 주세요.",
+            "다른 매장의 QR" to "다른 매장의 QR 코드입니다.",
+            "서명 위조" to "QR 서명이 유효하지 않습니다.",
+            "형식 오류" to "유효하지 않은 QR 토큰입니다.",
+        )
+        val content = Content().addMediaType(
+            "application/json",
+            MediaType()
+                .schema(Schema<Any>().`$ref`("#/components/schemas/ApiError"))
+                .apply {
+                    examples.forEach { (name, message) ->
+                        addExamples(
+                            name,
+                            Example().value(
+                                mapOf(
+                                    "code" to "BAD_REQUEST",
+                                    "message" to message,
+                                    "timestamp" to "2026-07-01T06:20:23.310Z",
+                                    "fields" to emptyMap<String, String>(),
+                                ),
+                            ),
+                        )
+                    }
+                },
+        )
+        operation.responses.addApiResponse(
+            "400",
+            ApiResponse().description("QR 검증 실패 (QrCodeService.verify) — 사유별 예시 참고").content(content),
+        )
     }
 
     private fun apiErrorSchema(): Schema<*> =

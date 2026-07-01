@@ -36,7 +36,7 @@ qr:
   secret: ${QR_SECRET:dev-only-qr-secret-please-override-in-production}
   # QR 토큰 허용 수명(초). 0 이하면 시간 검사를 생략하고 서명·매장만 검증한다.
   # (회전형 QR을 쓰면 양수로 설정해 만료를 강제)
-  max-age-seconds: ${QR_MAX_AGE_SECONDS:0}
+  max-age-seconds: ${QR_MAX_AGE_SECONDS:60}
 
 fcm:
   # true 로 켜면 실제 FCM 발송(FcmPushSender). 기본은 로그 스텁(LoggingPushSender)

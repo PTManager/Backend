@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.security.MessageDigest
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -19,9 +20,14 @@ class QrCodeService(
 
     private val keySpec = SecretKeySpec(secret.toByteArray(), HMAC_ALGORITHM)
 
+    // 매장별 가장 최근 발급 시각(epochSeconds). 인메모리 전용이라 서버 재시작 시 초기화된다.
+    private val latestIssuedAt = ConcurrentHashMap<Long, Long>()
+
     /** 해당 매장의 현재 QR 토큰을 발급한다. (사장 앱이 매장에 게시할 QR 생성용) */
     fun issue(workplaceId: Long): String {
-        val payload = "wp$workplaceId:${Instant.now().epochSecond}"
+        val issuedAt = Instant.now().epochSecond
+        latestIssuedAt[workplaceId] = issuedAt
+        val payload = "wp$workplaceId:$issuedAt"
         return "$payload:${sign(payload)}"
     }
 
@@ -36,12 +42,17 @@ class QrCodeService(
         val payload = "$workplacePart:$timestampPart"
         require(constantTimeEquals(sign(payload), signature)) { "QR 서명이 유효하지 않습니다." }
 
+        val issuedAt = timestampPart.toLongOrNull()
+            ?: throw IllegalArgumentException("유효하지 않은 QR 토큰입니다.")
+
         if (maxAgeSeconds > 0) {
-            val issuedAt = timestampPart.toLongOrNull()
-                ?: throw IllegalArgumentException("유효하지 않은 QR 토큰입니다.")
             val age = Instant.now().epochSecond - issuedAt
             require(age in 0..maxAgeSeconds) { "만료된 QR 코드입니다." }
         }
+
+        // 서버 재시작 등으로 기록이 없으면(=아직 아무 발급도 기억 못함) 통과시킨다.
+        val latest = latestIssuedAt[workplaceId]
+        require(latest == null || issuedAt == latest) { "이미 갱신된 QR 코드입니다. 최신 QR로 다시 스캔해 주세요." }
     }
 
     private fun sign(payload: String): String {
