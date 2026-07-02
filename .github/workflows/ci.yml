@@ -22,3 +22,35 @@ jobs:
 
       - name: Build & test (H2 in-memory)
         run: ./gradlew build --no-daemon
+
+  # 운영은 PostgreSQL + Flyway로 마이그레이션한다. 테스트(build 잡)는 H2 엔티티 기반이라
+  # SQL 마이그레이션 자체는 검증되지 않으므로, 여기서 실제 Postgres에 적용해 문법·순서를 확인한다.
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ptmanager
+          POSTGRES_USER: ptmanager
+          POSTGRES_PASSWORD: ptmanager
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ptmanager"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply Flyway migrations on PostgreSQL
+        run: |
+          docker run --rm --network host \
+            -v "${{ github.workspace }}/src/main/resources/db/migration:/flyway/sql" \
+            flyway/flyway:11.7.2 \
+            -url=jdbc:postgresql://localhost:5432/ptmanager \
+            -user=ptmanager -password=ptmanager \
+            -connectRetries=10 \
+            migrate

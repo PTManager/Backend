@@ -12,6 +12,7 @@ import com.ptmanager.backend.repository.SwapRequestRepository
 import com.ptmanager.backend.repository.UserRepository
 import com.ptmanager.backend.shift.dto.ShiftResponse
 import org.springframework.http.HttpStatus
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
@@ -155,6 +156,52 @@ class ShiftService(
 
         val saved = shiftRepository.save(shift)
         return toResponse(saved, employeeNameOf(saved.employeeId))
+    }
+
+    @Transactional
+    fun checkOut(shiftId: Long, currentUserId: Long, qrToken: String): ShiftResponse {
+        val shift = getShift(shiftId)
+        if (shift.employeeId != currentUserId) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인 근무만 퇴근 체크할 수 있습니다.")
+        }
+        if (shift.checkedInAt == null) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "출근하지 않은 근무입니다.")
+        }
+        if (shift.checkedOutAt != null) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "이미 퇴근 처리된 근무입니다.")
+        }
+        qrCodeService.verify(shift.workplaceId, qrToken)
+
+        shift.checkedOutAt = Instant.now()
+        val saved = shiftRepository.save(shift)
+        return toResponse(saved, employeeNameOf(saved.employeeId))
+    }
+
+    /**
+     * 근무 종료 시각이 지났는데도 체크인하지 않은(SCHEDULED) 근무를 결근(ABSENT) 처리한다.
+     * ponytail: 매일 04시 1회. 실시간 결근 반영이 필요하면 주기를 줄이거나 조회 시점에 판정.
+     */
+    @Scheduled(cron = "0 0 4 * * *")
+    @Transactional
+    fun markAbsentees() {
+        val now = Instant.now()
+        val candidates = shiftRepository.findByAttendanceStatusAndWorkDateLessThanEqual(
+            AttendanceStatus.SCHEDULED,
+            LocalDate.now(),
+        )
+        for (shift in candidates) {
+            if (now.isAfter(scheduledEndInstant(shift))) {
+                shift.attendanceStatus = AttendanceStatus.ABSENT
+            }
+        }
+        // JPA dirty checking이 트랜잭션 커밋 시 반영한다.
+    }
+
+    /** 야간 교대(end ≤ start)는 익일 종료로 보정. */
+    private fun scheduledEndInstant(shift: Shift): Instant {
+        val endDate =
+            if (shift.endTime <= shift.startTime) shift.workDate.plusDays(1) else shift.workDate
+        return endDate.atTime(shift.endTime).atZone(ZoneId.systemDefault()).toInstant()
     }
 
     private fun getShift(id: Long): Shift {

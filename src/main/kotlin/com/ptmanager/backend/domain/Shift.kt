@@ -40,6 +40,9 @@ class Shift(
     @Column(name = "checked_in_at")
     var checkedInAt: Instant? = null,
 
+    @Column(name = "checked_out_at")
+    var checkedOutAt: Instant? = null,
+
     @Enumerated(EnumType.STRING)
     @Column(name = "attendance_status", nullable = false, length = 16)
     var attendanceStatus: AttendanceStatus = AttendanceStatus.SCHEDULED,

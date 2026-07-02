@@ -84,4 +84,11 @@ class ShiftController(
         @PathVariable shiftId: Long,
         @Valid @RequestBody request: CheckInRequest,
     ): ShiftResponse = shiftService.checkIn(shiftId, userId, request.qrToken)
+
+    @PostMapping("/{shiftId}/check-out")
+    fun checkOut(
+        @AuthenticationPrincipal userId: Long,
+        @PathVariable shiftId: Long,
+        @Valid @RequestBody request: CheckInRequest,
+    ): ShiftResponse = shiftService.checkOut(shiftId, userId, request.qrToken)
 }

@@ -7,7 +7,9 @@ import com.ptmanager.backend.payroll.dto.LaborCostReport.EmployeeCost
 import com.ptmanager.backend.repository.ShiftRepository
 import com.ptmanager.backend.repository.UserRepository
 import com.ptmanager.backend.repository.WorkplaceRepository
+import com.ptmanager.backend.domain.Shift
 import org.springframework.stereotype.Service
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.NoSuchElementException
@@ -32,7 +34,7 @@ class LaborCostService(
 
         val minutesByEmployee = LinkedHashMap<Long, Long>()
         for (shift in shifts) {
-            val minutes = workedMinutes(shift.startTime, shift.endTime)
+            val minutes = actualOrScheduledMinutes(shift)
             minutesByEmployee.merge(shift.employeeId, minutes) { a, b -> a + b }
         }
 
@@ -48,6 +50,17 @@ class LaborCostService(
         }
 
         return LaborCostReport(workplaceId, from, to, totalCost, employees)
+    }
+
+    /** 출퇴근 기록이 모두 있으면 실제 근무시간, 없으면 편성 시간으로 계산한다. */
+    private fun actualOrScheduledMinutes(shift: Shift): Long {
+        val inAt = shift.checkedInAt
+        val outAt = shift.checkedOutAt
+        return if (inAt != null && outAt != null && outAt.isAfter(inAt)) {
+            Duration.between(inAt, outAt).toMinutes()
+        } else {
+            workedMinutes(shift.startTime, shift.endTime)
+        }
     }
 
     /** 근무 시간(분). 야간 교대(end ≤ start)는 익일로 보정해 양수로 계산한다. */
