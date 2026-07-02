@@ -1,5 +1,7 @@
 package com.ptmanager.backend.notice
 
+import com.ptmanager.backend.common.orNotFound
+
 import com.ptmanager.backend.common.access.WorkplaceAccessGuard
 import com.ptmanager.backend.common.storage.StorageService
 import com.ptmanager.backend.domain.Notice
@@ -96,7 +98,7 @@ class NoticeService(
         val latest = noticeRepository.findFirstByWorkplaceIdOrderByCreatedAtDesc(workplaceId)
             ?: return false
         val user = userRepository.findById(userId)
-            .orElseThrow { NoSuchElementException("User not found.") }
+            .orNotFound("User not found.")
         val lastRead = user.lastReadNoticeAt ?: return true
         val latestCreatedAt = latest.createdAt ?: return false
         return latestCreatedAt.isAfter(lastRead)
@@ -105,14 +107,14 @@ class NoticeService(
     @Transactional
     fun markRead(userId: Long) {
         val user = userRepository.findById(userId)
-            .orElseThrow { NoSuchElementException("User not found.") }
+            .orNotFound("User not found.")
         user.lastReadNoticeAt = Instant.now()
         userRepository.save(user)
     }
 
     private fun getNotice(id: Long): Notice {
         val notice = noticeRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Notice not found.") }
+            .orNotFound("Notice not found.")
         accessGuard.requireMemberOf(notice.workplaceId)
         return notice
     }

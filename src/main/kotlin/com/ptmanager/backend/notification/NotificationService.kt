@@ -1,12 +1,10 @@
 package com.ptmanager.backend.notification
 
-import com.ptmanager.backend.common.push.PushSender
+import com.ptmanager.backend.common.orNotFound
 import com.ptmanager.backend.domain.Notification
-import com.ptmanager.backend.domain.NotificationSetting
 import com.ptmanager.backend.domain.NotificationType
-import com.ptmanager.backend.repository.DeviceTokenRepository
 import com.ptmanager.backend.repository.NotificationRepository
-import com.ptmanager.backend.repository.NotificationSettingRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
@@ -16,9 +14,7 @@ import java.util.NoSuchElementException
 @Service
 class NotificationService(
     private val notificationRepository: NotificationRepository,
-    private val notificationSettingRepository: NotificationSettingRepository,
-    private val deviceTokenRepository: DeviceTokenRepository,
-    private val pushSender: PushSender,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
 
     fun findByUser(userId: Long, isRead: Boolean?, pageable: Pageable): Page<Notification> =
@@ -50,11 +46,8 @@ class NotificationService(
                 read = false,
             ),
         )
-        // FCM 푸시는 사용자의 알림 설정으로 게이팅한다.
-        if (isPushEnabled(userId, type)) {
-            val tokens = deviceTokenRepository.findByUserId(userId).map { it.token }
-            pushSender.send(tokens, type, message, targetType, targetId)
-        }
+        // FCM 푸시는 트랜잭션 커밋 후에만 나가도록 이벤트로 넘긴다. (NotificationPushListener)
+        eventPublisher.publishEvent(PushRequested(listOf(userId), type, message, targetType, targetId))
         return notification
     }
 
@@ -67,13 +60,27 @@ class NotificationService(
         targetType: String? = null,
         targetId: Long? = null,
     ) {
-        userIds.forEach { notify(it, type, message, targetType, targetId) }
+        if (userIds.isEmpty()) return
+        // 인앱 알림은 한 번에 배치 저장하고, 푸시는 커밋 후 멀티캐스트 1회로 묶는다.
+        notificationRepository.saveAll(
+            userIds.map { userId ->
+                Notification(
+                    userId = userId,
+                    type = type,
+                    message = message,
+                    targetType = targetType,
+                    targetId = targetId,
+                    read = false,
+                )
+            },
+        )
+        eventPublisher.publishEvent(PushRequested(userIds, type, message, targetType, targetId))
     }
 
     @Transactional
     fun markRead(id: Long, userId: Long) {
         val notification = notificationRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Notification not found.") }
+            .orNotFound("Notification not found.")
         // 본인 알림이 아니면 존재 자체를 숨긴다(정보 노출 방지).
         if (notification.userId != userId) {
             throw NoSuchElementException("Notification not found.")
@@ -87,21 +94,5 @@ class NotificationService(
         val unread = notificationRepository.findByUserIdAndRead(userId, false)
         unread.forEach { it.read = true }
         notificationRepository.saveAll(unread)
-    }
-
-    /** 알림 종류별로 사용자의 푸시 수신 설정을 확인한다. (설정 없으면 기본 ON) */
-    private fun isPushEnabled(userId: Long, type: NotificationType): Boolean {
-        val setting = notificationSettingRepository.findById(userId)
-            .orElseGet { NotificationSetting(userId = userId) }
-        return when (type) {
-            NotificationType.SWAP_REQUEST,
-            NotificationType.SWAP_APPLICATION,
-            NotificationType.SWAP_RESULT,
-            -> setting.swapEnabled
-            NotificationType.NOTICE -> setting.noticeEnabled
-            NotificationType.ATTENDANCE -> setting.attendanceEnabled
-            NotificationType.JOIN_REQUEST -> setting.joinRequestEnabled
-            NotificationType.SCHEDULE_CHANGED -> true
-        }
     }
 }

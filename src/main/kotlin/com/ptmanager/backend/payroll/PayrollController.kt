@@ -2,6 +2,7 @@ package com.ptmanager.backend.payroll
 
 import com.ptmanager.backend.payroll.dto.PayrollItem
 import com.ptmanager.backend.payroll.dto.PayrollSummary
+import com.ptmanager.backend.payroll.dto.WeeklyPayrollSummary
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
@@ -41,5 +42,20 @@ class PayrollController(
             )
         }
         return PayrollSummary(workplaceId, yearMonth, report.totalCost, items)
+    }
+
+    /** 월 인건비의 주차별(1–7, 8–14, 15–21, 22–말일) 추이. yearMonth 예: 2026-06 */
+    @GetMapping("/weekly")
+    @PreAuthorize("hasRole('EMPLOYER')")
+    fun weekly(
+        @RequestParam workplaceId: Long,
+        @RequestParam yearMonth: String,
+    ): WeeklyPayrollSummary {
+        val ym = try {
+            YearMonth.parse(yearMonth)
+        } catch (ex: DateTimeParseException) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "yearMonth 형식이 올바르지 않습니다 (YYYY-MM).")
+        }
+        return WeeklyPayrollSummary(workplaceId, yearMonth, laborCostService.weeklyTotals(workplaceId, ym))
     }
 }

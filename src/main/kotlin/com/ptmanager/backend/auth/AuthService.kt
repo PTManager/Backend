@@ -1,5 +1,7 @@
 package com.ptmanager.backend.auth
 
+import com.ptmanager.backend.common.orNotFound
+
 import com.ptmanager.backend.auth.dto.TokenResponse
 import com.ptmanager.backend.config.security.JwtTokenProvider
 import com.ptmanager.backend.domain.User
@@ -58,7 +60,7 @@ class AuthService(
 
     fun getMe(userId: Long): User =
         userRepository.findById(userId)
-            .orElseThrow { NoSuchElementException("User not found.") }
+            .orNotFound("User not found.")
 
     /** 현재 기기의 FCM 토큰을 제거한다. (스테이트리스 JWT라 액세스 토큰 자체는 만료까지 유효) */
     @Transactional

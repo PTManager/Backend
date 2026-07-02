@@ -1,5 +1,7 @@
 package com.ptmanager.backend.user
 
+import com.ptmanager.backend.common.orNotFound
+
 import com.ptmanager.backend.domain.DeviceToken
 import com.ptmanager.backend.domain.NotificationSetting
 import com.ptmanager.backend.domain.Platform
@@ -21,7 +23,7 @@ class UserService(
     @Transactional
     fun updateProfile(userId: Long, name: String): User {
         val user = userRepository.findById(userId)
-            .orElseThrow { NoSuchElementException("User not found.") }
+            .orNotFound("User not found.")
         user.name = name
         return userRepository.save(user)
     }

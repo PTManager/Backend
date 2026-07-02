@@ -1,5 +1,7 @@
 package com.ptmanager.backend.shift
 
+import com.ptmanager.backend.common.orNotFound
+
 import com.ptmanager.backend.common.access.WorkplaceAccessGuard
 import com.ptmanager.backend.domain.AttendanceStatus
 import com.ptmanager.backend.domain.NotificationType
@@ -45,7 +47,7 @@ class ShiftService(
         }
         if (employeeId != null && employeeId != accessGuard.currentUserId()) {
             val target = userRepository.findById(employeeId)
-                .orElseThrow { NoSuchElementException("User not found.") }
+                .orNotFound("User not found.")
             accessGuard.requireMemberOf(
                 target.workplaceId
                     ?: throw ResponseStatusException(HttpStatus.FORBIDDEN, "해당 직원에 접근 권한이 없습니다."),
@@ -60,7 +62,11 @@ class ShiftService(
                 shiftRepository.findByWorkplaceIdOrderByWorkDateAscStartTimeAsc(workplaceId)
             else -> emptyList()
         }
-        val shifts = if (status == null) base else base.filter { it.attendanceStatus == status }
+        // 날짜 범위는 모든 조회 경로에 일괄 적용한다. (employee 조회에서도 from/to가 반영되도록)
+        val dateFiltered = base.filter {
+            (from == null || !it.workDate.isBefore(from)) && (to == null || !it.workDate.isAfter(to))
+        }
+        val shifts = if (status == null) dateFiltered else dateFiltered.filter { it.attendanceStatus == status }
 
         val names = userRepository.findAllById(shifts.map { it.employeeId }.distinct())
             .associate { it.id to it.name }
@@ -206,7 +212,7 @@ class ShiftService(
 
     private fun getShift(id: Long): Shift {
         val shift = shiftRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Shift not found.") }
+            .orNotFound("Shift not found.")
         accessGuard.requireMemberOf(shift.workplaceId)
         return shift
     }

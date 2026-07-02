@@ -1,5 +1,7 @@
 package com.ptmanager.backend.swaprequest
 
+import com.ptmanager.backend.common.orNotFound
+
 import com.ptmanager.backend.common.access.WorkplaceAccessGuard
 import com.ptmanager.backend.domain.NotificationType
 import com.ptmanager.backend.domain.Shift
@@ -35,7 +37,7 @@ class SwapRequestService(
     @Transactional
     fun createSwapRequest(requesterId: Long, shiftId: Long, reason: String): SwapRequest {
         val shift = shiftRepository.findById(shiftId)
-            .orElseThrow { NoSuchElementException("Shift not found.") }
+            .orNotFound("Shift not found.")
         if (shift.employeeId != requesterId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인 근무만 대타 요청할 수 있습니다.")
         }
@@ -87,7 +89,7 @@ class SwapRequestService(
 
     fun getDetail(id: Long): SwapRequestDetail {
         val request = swapRequestRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Swap request not found.") }
+            .orNotFound("Swap request not found.")
         accessGuard.requireMemberOf(request.workplaceId)
         val shift = shiftRepository.findById(request.shiftId).orElse(null)
         val applications = swapApplicationRepository.findBySwapRequestId(id)
@@ -107,7 +109,7 @@ class SwapRequestService(
 
     fun listApplications(swapRequestId: Long): List<SwapApplicationResponse> {
         val request = swapRequestRepository.findById(swapRequestId)
-            .orElseThrow { NoSuchElementException("Swap request not found.") }
+            .orNotFound("Swap request not found.")
         accessGuard.requireMemberOf(request.workplaceId)
         return toApplicationResponses(swapApplicationRepository.findBySwapRequestId(swapRequestId))
     }
@@ -121,7 +123,7 @@ class SwapRequestService(
     @Transactional
     fun apply(swapRequestId: Long, applicantId: Long): SwapApplicationResponse {
         val request = swapRequestRepository.findById(swapRequestId)
-            .orElseThrow { NoSuchElementException("Swap request not found.") }
+            .orNotFound("Swap request not found.")
         if (request.requesterId == applicantId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인 요청에는 지원할 수 없습니다.")
         }
@@ -133,7 +135,7 @@ class SwapRequestService(
             throw ResponseStatusException(HttpStatus.CONFLICT, "이미 지원한 요청입니다.")
         }
         val targetShift = shiftRepository.findById(request.shiftId)
-            .orElseThrow { NoSuchElementException("Shift not found.") }
+            .orNotFound("Shift not found.")
         // 더블부킹: 확정 근무 + 다른 열린 대타에 낸 PENDING 지원까지 포함해 시간 겹침 검사
         if (hasTimeConflict(targetShift, committedShifts(applicantId))) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "같은 시간대에 이미 근무/지원이 있어 지원할 수 없습니다.")
@@ -141,17 +143,17 @@ class SwapRequestService(
         val saved = swapApplicationRepository.save(
             SwapApplication(swapRequestId = swapRequestId, applicantId = applicantId),
         )
-        return toApplicationResponse(saved)
+        return toApplicationResponse(saved, applicantNameOf(applicantId))
     }
 
     @Transactional
     fun approve(swapRequestId: Long, applicantId: Long): SwapRequest {
         val request = swapRequestRepository.findById(swapRequestId)
-            .orElseThrow { NoSuchElementException("Swap request not found.") }
+            .orNotFound("Swap request not found.")
         accessGuard.requireMemberOf(request.workplaceId)
 
         val targetShift = shiftRepository.findById(request.shiftId)
-            .orElseThrow { NoSuchElementException("Shift not found.") }
+            .orNotFound("Shift not found.")
         // 승인 시점 재검증: 대타자의 확정 근무와 시간이 겹치면 승인 불가
         val assignedShifts = shiftRepository.findByEmployeeIdOrderByWorkDateAscStartTimeAsc(applicantId)
         if (hasTimeConflict(targetShift, assignedShifts)) {
@@ -167,7 +169,7 @@ class SwapRequestService(
         }
         // markApproved가 영속성 컨텍스트를 clear 하므로 재조회한다.
         val approved = swapRequestRepository.findById(swapRequestId)
-            .orElseThrow { NoSuchElementException("Swap request not found.") }
+            .orNotFound("Swap request not found.")
 
         val applications = swapApplicationRepository.findBySwapRequestId(swapRequestId)
         applications.forEach {
@@ -195,7 +197,7 @@ class SwapRequestService(
     @Transactional
     fun reject(id: Long): SwapRequest {
         val request = swapRequestRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Swap request not found.") }
+            .orNotFound("Swap request not found.")
         accessGuard.requireMemberOf(request.workplaceId)
 
         val updated = swapRequestRepository.markStatus(
@@ -205,7 +207,7 @@ class SwapRequestService(
             throw ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 대타 요청입니다.")
         }
         val rejected = swapRequestRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Swap request not found.") }
+            .orNotFound("Swap request not found.")
         notificationService.notify(
             rejected.requesterId, NotificationType.SWAP_RESULT, "대타 요청이 거절되었습니다.",
             targetType = "SWAP_REQUEST", targetId = rejected.id,
@@ -216,11 +218,13 @@ class SwapRequestService(
     /** 지원자가 이미 묶여 있는 근무들: 확정 배정 근무 + 다른 열린 대타에 낸 PENDING 지원의 대상 근무. */
     private fun committedShifts(employeeId: Long): List<Shift> {
         val assigned = shiftRepository.findByEmployeeIdOrderByWorkDateAscStartTimeAsc(employeeId)
-        val pendingAppShiftIds = swapApplicationRepository.findByApplicantIdOrderByCreatedAtDesc(employeeId)
+        val pendingRequestIds = swapApplicationRepository.findByApplicantIdOrderByCreatedAtDesc(employeeId)
             .filter { it.status == SwapRequestStatus.PENDING }
-            .mapNotNull { app -> swapRequestRepository.findById(app.swapRequestId).orElse(null)?.shiftId }
+            .map { it.swapRequestId }
             .distinct()
-        val pendingAppShifts = pendingAppShiftIds.mapNotNull { shiftRepository.findById(it).orElse(null) }
+        // findById 반복 대신 두 번의 배치 조회로 대상 근무를 모은다.
+        val pendingShiftIds = swapRequestRepository.findAllById(pendingRequestIds).map { it.shiftId }
+        val pendingAppShifts = shiftRepository.findAllById(pendingShiftIds)
         return assigned + pendingAppShifts
     }
 
@@ -251,9 +255,13 @@ class SwapRequestService(
         return applications.map { toApplicationResponse(it, names[it.applicantId]) }
     }
 
+    private fun applicantNameOf(applicantId: Long): String? =
+        userRepository.findById(applicantId).orElse(null)?.name
+
+    // applicantName은 호출부에서 명시적으로 넘긴다. (기본인자에서 DB를 치던 N+1 함정 제거)
     private fun toApplicationResponse(
         application: SwapApplication,
-        applicantName: String? = userRepository.findById(application.applicantId).orElse(null)?.name,
+        applicantName: String?,
     ): SwapApplicationResponse =
         SwapApplicationResponse(
             id = application.id,

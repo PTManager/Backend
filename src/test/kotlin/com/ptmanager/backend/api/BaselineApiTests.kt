@@ -246,6 +246,55 @@ class BaselineApiTests {
     }
 
     @Test
+    fun weeklyPayrollBucketsByWeekOfMonth() {
+        // 시드/타 테스트와 격리된 신규 매장·직원으로 검증 (실행 순서·시드 시각에 의존하지 않음)
+        val (bossToken, _) = signupReturning("weeklyboss@ptmanager.test", "주간사장", "EMPLOYER")
+        val (wid, code) = createWorkplace(bossToken, "주간 매장")
+        val (empToken, empId) = signupReturning("weeklyemp@ptmanager.test", "주간알바", "EMPLOYEE")
+        joinAndApprove(empToken, code, bossToken)
+
+        mockMvc.perform(
+            patch("/api/workplaces/$wid/members/$empId/wage")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $bossToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"hourlyWage":10000}"""),
+        ).andExpect(status().isOk)
+
+        // 1주(3일, 5시간→50000) + 3주(18일, 4시간→40000). 2·4주는 0이어야 한다.
+        createShiftOn(bossToken, wid, empId, "2026-03-03", "09:00:00", "14:00:00")
+        createShiftOn(bossToken, wid, empId, "2026-03-18", "09:00:00", "13:00:00")
+
+        mockMvc.perform(
+            get("/api/payroll/weekly?workplaceId=$wid&yearMonth=2026-03")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $bossToken"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.weeks.length()", `is`(4)))
+            .andExpect(jsonPath("$.weeks[0].amount", `is`(50000)))
+            .andExpect(jsonPath("$.weeks[1].amount", `is`(0)))
+            .andExpect(jsonPath("$.weeks[2].amount", `is`(40000)))
+            .andExpect(jsonPath("$.weeks[3].amount", `is`(0)))
+    }
+
+    private fun createShiftOn(
+        employerToken: String,
+        workplaceId: Long,
+        employeeId: Long,
+        workDate: String,
+        start: String,
+        end: String,
+    ) {
+        mockMvc.perform(
+            post("/api/shifts")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $employerToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"workplaceId":$workplaceId,"employeeId":$employeeId,"workDate":"$workDate","startTime":"$start","endTime":"$end"}""",
+                ),
+        ).andExpect(status().isCreated)
+    }
+
+    @Test
     fun noticeResponseIncludesAuthorNameAndAttachments() {
         // 새 사장 가입 → 매장 생성(자동 소속) → 첨부 포함 공지 작성 → 응답 검증
         val signup = mockMvc.perform(

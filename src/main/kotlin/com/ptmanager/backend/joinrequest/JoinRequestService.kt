@@ -1,5 +1,7 @@
 package com.ptmanager.backend.joinrequest
 
+import com.ptmanager.backend.common.orNotFound
+
 import com.ptmanager.backend.common.access.WorkplaceAccessGuard
 import com.ptmanager.backend.domain.JoinRequest
 import com.ptmanager.backend.domain.JoinRequestStatus
@@ -59,7 +61,7 @@ class JoinRequestService(
     @Transactional
     fun updateStatus(id: Long, status: JoinRequestStatus): JoinRequestResponse {
         val request = joinRequestRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Join request not found.") }
+            .orNotFound("Join request not found.")
         accessGuard.requireMemberOf(request.workplaceId)
 
         // 원자적 가드: PENDING일 때만 전이 (영향 행 0이면 이미 처리됨)
@@ -69,11 +71,11 @@ class JoinRequestService(
         }
         // markStatus가 영속성 컨텍스트를 clear 하므로 재조회
         val saved = joinRequestRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Join request not found.") }
+            .orNotFound("Join request not found.")
 
         if (status == JoinRequestStatus.APPROVED) {
             val user = userRepository.findById(saved.userId)
-                .orElseThrow { NoSuchElementException("User not found.") }
+                .orNotFound("User not found.")
             user.workplaceId = saved.workplaceId
             userRepository.save(user)
         }

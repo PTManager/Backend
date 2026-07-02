@@ -1,5 +1,7 @@
 package com.ptmanager.backend.workplace
 
+import com.ptmanager.backend.common.orNotFound
+
 import com.ptmanager.backend.common.access.WorkplaceAccessGuard
 import com.ptmanager.backend.domain.User
 import com.ptmanager.backend.domain.UserRole
@@ -29,7 +31,7 @@ class WorkplaceService(
     fun getWorkplace(id: Long): Workplace {
         accessGuard.requireMemberOf(id)
         return workplaceRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Workplace not found.") }
+            .orNotFound("Workplace not found.")
     }
 
     fun findMembers(workplaceId: Long, role: UserRole?): List<User> {
@@ -46,7 +48,7 @@ class WorkplaceService(
     fun updateMemberWage(workplaceId: Long, userId: Long, hourlyWage: Int): User {
         accessGuard.requireMemberOf(workplaceId)
         val user = userRepository.findById(userId)
-            .orElseThrow { NoSuchElementException("User not found.") }
+            .orNotFound("User not found.")
         // 해당 매장 소속 멤버가 아니면 존재를 숨긴다.
         if (user.workplaceId != workplaceId) {
             throw NoSuchElementException("User not found.")
@@ -62,7 +64,7 @@ class WorkplaceService(
         )
         // 생성자는 해당 매장에 소속된다.
         val creator = userRepository.findById(accessGuard.currentUserId())
-            .orElseThrow { NoSuchElementException("User not found.") }
+            .orNotFound("User not found.")
         creator.workplaceId = workplace.id
         userRepository.save(creator)
         return workplace
