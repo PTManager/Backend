@@ -37,3 +37,10 @@ spring:
 logging:
   level:
     org.springframework.security: ${LOG_SECURITY:INFO}
+    org.hibernate.SQL: ${LOG_SQL:INFO}
+    org.hibernate.orm.results: ${LOG_SQL:INFO}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_SQL:INFO}
+    org.hibernate.resource.transaction: ${LOG_SQL:INFO}
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: ${LOG_SQL:INFO}
+    org.springframework.data.jpa.repository.query: ${LOG_SQL:INFO}
+    org.hibernate.type: ${LOG_SQL:INFO}

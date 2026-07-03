@@ -51,6 +51,9 @@ class SecurityConfig(
 
     companion object {
         private val PUBLIC_PATHS = arrayOf(
+            // 예외 발생 시 스프링이 포워딩하는 에러 디스패치 경로. 열어두지 않으면
+            // 내부 500 이 인증 필터에 걸려 '빈 401'로 둔갑해 진짜 원인이 가려진다.
+            "/error",
             "/api/auth/signup",
             "/api/auth/login",
             "/api/auth/refresh",
