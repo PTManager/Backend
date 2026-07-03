@@ -13,7 +13,7 @@
 | PTManagerEmployee | 직원용 안드로이드 앱 — 스케줄 확인, QR 출근, 대타 요청·지원 |
 | PTManagerEmployer | 사장용 안드로이드 앱 — 스케줄 편성, 대타 검토·승인, 출근 현황·인건비 |
 
-두 앱은 동일한 5탭 골격(홈·스케줄·대타·공지·내 정보)을 공유하되 역할(EMPLOYEE/EMPLOYER)에 따라 화면을 다르게 구성하며, API 명세를 기준 문서로 삼아 서버·클라이언트가 병렬 개발한다.
+두 앱은 동일한 5탭 골격(홈·스케줄·소통/승인·통계·내 정보)을 공유하되 역할(EMPLOYEE/EMPLOYER)에 따라 화면을 다르게 구성하며, API 명세를 기준 문서로 삼아 서버·클라이언트가 병렬 개발한다.
 
 ## 기술 스택 (목표)
 
@@ -31,7 +31,7 @@
 | API 문서 | Swagger (SpringDoc) | 안드로이드 팀과 스펙 공유 |
 | 인프라 | AWS EC2 + RDS, GitHub Actions | 빌드/배포 |
 
-도메인 컨트롤러는 Auth · Workplace · User · Shift · SwapRequest · Notice · Notification · Payroll · Health 로 분리되며, 공통 `ApiExceptionHandler`로 일관된 에러 응답을 제공한다.
+도메인 컨트롤러는 Auth · Workplace · User · Shift · SwapRequest · SwapApplication · JoinRequest · Notice · Handover · Notification · Payroll · Health 로 분리되며, 공통 `ApiExceptionHandler`로 일관된 에러 응답을 제공한다.
 
 ## 실행
 
@@ -114,19 +114,37 @@ curl -X POST http://localhost:8080/api/auth/login \
 
 | 계정 | 역할 | 비밀번호 | 매장 (초대코드) |
 | --- | --- | --- | --- |
-| `employee@ptmanager.test` | EMPLOYEE | `password` | PT Manager Cafe (`CAFE01`) |
 | `employer@ptmanager.test` | EMPLOYER | `password` | PT Manager Cafe (`CAFE01`) |
+| `employee@ptmanager.test` | EMPLOYEE | `password` | PT Manager Cafe (`CAFE01`) |
+| `employee2@ptmanager.test` | EMPLOYEE | `password` | PT Manager Cafe (`CAFE01`) |
+| `employee3@ptmanager.test` | EMPLOYEE | `password` | PT Manager Cafe (`CAFE01`) |
+| `applicant@ptmanager.test` | EMPLOYEE | `password` | (미소속 — 가입 신청 `PENDING`) |
 
-직원 계정에는 시드 근무 2건(오늘·내일)이 함께 들어간다.
+시급은 계정마다 다르게(11,000~13,000원) 설정돼 인건비 화면이 구분된다. 함께 적재되는 데모 데이터:
 
-## 구현 현황 (MVP)
+- **근무 스케줄**: 직원 3명에게 지난 14일~향후 7일치 근무. 지난 근무는 출퇴근 기록 포함(PRESENT/LATE/ABSENT 혼합)이라 누적 인건비·주차별 추이가 채워진다.
+- **공지** 3건, **인수인계** 4건(재고/기기/손님).
+- **대타 요청** 2건 — 지원자 2명이 붙은 `PENDING` 1건(사장 승인 대기), 대타 확정된 `APPROVED` 1건.
+- **가입 신청** 1건(`applicant@`), **알림** 4건(일부 미확인).
 
-> [API_SPEC.md](API_SPEC.md)와 [ERD.md](ERD.md)는 PTManager의 **목표 설계**다. 현재 백엔드는 MVP 초기 단계로, 그 설계의 일부만 구현되어 있다.
+## 구현 현황
 
-현재 동작하는 범위:
+> [API_SPEC.md](API_SPEC.md)와 [ERD.md](ERD.md)의 **목표 설계**는 대부분 구현되어 있다. 남은 것은 실시간(WebSocket)·캐시(Redis)뿐이다.
 
-- **인증은 데모 스텁이다.** 비밀번호가 `password`로 하드코딩되어 있고, 발급되는 `dev-token-{id}`는 검증되지 않으며, 아직 역할 기반 권한(RBAC)도 없다. JWT + 리프레시 + 권한 처리가 다음 단계다.
-- 도메인: 인증(로그인) · 매장/초대코드 · 근무/출근체크 · 대타 요청(요청·상태변경) · 가입 신청 · 공지 · 알림 · 인건비 집계.
-- 아직 미구현: 회원가입·JWT·토큰 갱신, 대타 **지원(application)** 과 승인 분리, QR 토큰 검증, 페이지네이션, 알림 설정·FCM 디바이스 토큰, 공지 첨부/읽음(레드 닷), 알림 배지, WebSocket·Redis·S3 연동.
+**구현 완료:**
 
-단계별 진행은 제안서의 향후 계획(요구사항 → 기본 기능 → 대타·QR·실시간 알림 → 인건비·공지·배포)을 따른다.
+- **인증** — 회원가입 · 로그인 · 토큰 갱신(`refresh`) · 로그아웃. Spring Security + **JWT(Bearer)** 로 실제 서명·검증하며, `@PreAuthorize`로 역할 기반 권한(RBAC)을 적용한다 (`config/security`).
+- **매장** — 생성 · 조회 · 멤버 목록 · 초대코드/QR 토큰 발급 · 시급 수정 · 멤버 방출.
+- **근무** — 편성(CRUD) · **QR 출근/퇴근 체크** (`QrCodeService`가 서명·매장·수명을 검증).
+- **대타** — 요청 → **지원(application)** → 사장 승인/거절의 3단계 워크플로우. 승인 시 지원자가 확정 대타자로 지정되고 근무가 재배정된다.
+- **가입 신청** — 초대코드 신청 → 사장 승인/거절.
+- **공지** — 작성 · 목록(페이지네이션) · **첨부(S3)** · 읽음/안읽음.
+- **인수인계** — 카테고리별(재고/기기/손님) 작성 · 조회 · 삭제.
+- **알림** — 목록 · 안읽음 개수(배지) · 읽음 처리 · 알림 설정 · **FCM 디바이스 토큰** 등록.
+- **인건비** — 월별 · 주차별 집계(사장) · 직원 본인 월 급여(`GET /payroll/me`, 실근태 기준).
+- **운영** — PostgreSQL + Flyway 마이그레이션(V1–V3). FCM·S3는 설정 플래그로 실제 발송/업로드 ↔ 로그·메모리 스텁 전환.
+
+**미구현:**
+
+- **WebSocket(STOMP) 실시간 알림** — 현재는 FCM 푸시로 대체.
+- **Redis 캐시** — 현재는 DB 직접 조회.

@@ -60,7 +60,7 @@ class LaborCostService(
      * 월을 4주 버킷(1–7, 8–14, 15–21, 22–말일)으로 나눠 주차별 인건비 합계를 낸다.
      * 근무는 한 번만 조회해 일자로 버킷에 분배한다. (calculate를 4번 부르지 않음)
      */
-    fun weeklyTotals(workplaceId: Long, month: YearMonth): List<WeeklyCost> {
+    fun weeklyTotals(workplaceId: Long, month: YearMonth, employeeId: Long? = null): List<WeeklyCost> {
         accessGuard.requireMemberOf(workplaceId)
         if (!workplaceRepository.existsById(workplaceId)) {
             throw NoSuchElementException("Workplace not found.")
@@ -68,6 +68,7 @@ class LaborCostService(
         val shifts = shiftRepository
             .findByWorkplaceIdAndWorkDateBetween(workplaceId, month.atDay(1), month.atEndOfMonth())
             .filter { it.attendanceStatus != AttendanceStatus.ABSENT }
+            .filter { employeeId == null || it.employeeId == employeeId }
         val wages = userRepository.findAllById(shifts.map { it.employeeId }.distinct())
             .associate { it.id to it.hourlyWage }
 
