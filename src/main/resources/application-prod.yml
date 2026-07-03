@@ -6,6 +6,13 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # 동시 요청 시 커넥션 풀 고갈로 타임아웃/실패나는 것을 완화.
+      # (RDS max_connections 여유 범위 내에서 조정. 인스턴스 확장 시 함께 늘릴 것)
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN:5}
+      connection-timeout: 10000              # 풀 대기 최대 10초
+      max-lifetime: 1800000                  # 커넥션 최대 수명 30분
   jpa:
     hibernate:
       ddl-auto: none
