@@ -30,17 +30,3 @@ spring:
   h2:
     console:
       enabled: false
-
-# 인증 401 원인 진단용 (확인 끝나면 제거 권장).
-# 요청마다 어떤 필터가 인증/인가를 어떻게 판정했는지 로그로 남는다.
-# 켜기: LOG_SECURITY=DEBUG (기본 INFO 라 평소엔 조용함)
-logging:
-  level:
-    org.springframework.security: ${LOG_SECURITY:INFO}
-    org.hibernate.SQL: ${LOG_SQL:INFO}
-    org.hibernate.orm.results: ${LOG_SQL:INFO}
-    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_SQL:INFO}
-    org.hibernate.resource.transaction: ${LOG_SQL:INFO}
-    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: ${LOG_SQL:INFO}
-    org.springframework.data.jpa.repository.query: ${LOG_SQL:INFO}
-    org.hibernate.type: ${LOG_SQL:INFO}
