@@ -234,6 +234,28 @@ class BaselineApiTests {
     }
 
     @Test
+    fun employerCanRemoveMember() {
+        // 시드 데이터를 건드리지 않도록 일회용 사장/매장/직원을 새로 만든다.
+        val (employerToken, _) = signupReturning("removeboss@ptmanager.test", "내보내기사장", "EMPLOYER")
+        val (workplaceId, inviteCode) = createWorkplace(employerToken, "내보내기 매장")
+        val (employeeToken, employeeId) = signupReturning("removee@ptmanager.test", "내보낼직원", "EMPLOYEE")
+        joinAndApprove(employeeToken, inviteCode, employerToken)
+
+        mockMvc.perform(
+            delete("/api/workplaces/$workplaceId/members/$employeeId")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $employerToken"),
+        )
+            .andExpect(status().isNoContent)
+
+        // 소속이 해제돼 더 이상 매장 멤버 목록에 없어야 한다.
+        val members = mockMvc.perform(
+            get("/api/workplaces/$workplaceId/members")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $employerToken"),
+        ).andExpect(status().isOk).andReturn().response.contentAsString
+        assert(!members.contains("removee@ptmanager.test")) { "내보낸 직원이 멤버 목록에 남아있다: $members" }
+    }
+
+    @Test
     fun employeeCannotSetWage() {
         val token = loginAs("employee@ptmanager.test")
         mockMvc.perform(

@@ -9,6 +9,7 @@ import com.ptmanager.backend.workplace.dto.UpdateWageRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -53,4 +54,12 @@ class WorkplaceController(
         @PathVariable userId: Long,
         @Valid @RequestBody request: UpdateWageRequest,
     ): User = workplaceService.updateMemberWage(workplaceId, userId, request.hourlyWage)
+
+    @DeleteMapping("/{workplaceId}/members/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('EMPLOYER')")
+    fun removeMember(
+        @PathVariable workplaceId: Long,
+        @PathVariable userId: Long,
+    ) = workplaceService.removeMember(workplaceId, userId)
 }

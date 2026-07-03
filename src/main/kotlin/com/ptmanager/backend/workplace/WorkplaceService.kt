@@ -9,8 +9,10 @@ import com.ptmanager.backend.domain.Workplace
 import com.ptmanager.backend.repository.UserRepository
 import com.ptmanager.backend.repository.WorkplaceRepository
 import com.ptmanager.backend.shift.QrCodeService
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
 import java.security.SecureRandom
 import java.util.NoSuchElementException
 
@@ -55,6 +57,24 @@ class WorkplaceService(
         }
         user.hourlyWage = hourlyWage
         return userRepository.save(user)
+    }
+
+    /** 매장에서 멤버를 내보낸다. (사장) 유저 계정은 유지하고 매장 소속만 해제한다. */
+    @Transactional
+    fun removeMember(workplaceId: Long, userId: Long) {
+        accessGuard.requireMemberOf(workplaceId)
+        // 사장이 자기 자신을 내보내면 매장이 주인 없이 남으므로 막는다.
+        if (userId == accessGuard.currentUserId()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "자기 자신은 내보낼 수 없습니다.")
+        }
+        val user = userRepository.findById(userId)
+            .orNotFound("User not found.")
+        // 해당 매장 소속 멤버가 아니면 존재를 숨긴다.
+        if (user.workplaceId != workplaceId) {
+            throw NoSuchElementException("User not found.")
+        }
+        user.workplaceId = null
+        userRepository.save(user)
     }
 
     @Transactional
