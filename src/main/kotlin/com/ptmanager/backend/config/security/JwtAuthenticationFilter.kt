@@ -30,7 +30,11 @@ class JwtAuthenticationFilter(
                 val role = jwtTokenProvider.parseRole(token)
                 val authorities = role?.let { listOf(SimpleGrantedAuthority("ROLE_$it")) } ?: emptyList()
                 val authentication = UsernamePasswordAuthenticationToken(userId, null, authorities)
-                SecurityContextHolder.getContext().authentication = authentication
+                // Spring Security 6 권장: 컨텍스트를 '수정'하지 말고 새로 만들어 '교체'한다.
+                // (deferred SecurityContext를 mutate 하면 이후 인가 단계에서 인증이 유실될 수 있음)
+                val context = SecurityContextHolder.createEmptyContext()
+                context.authentication = authentication
+                SecurityContextHolder.setContext(context)
             }
         }
         filterChain.doFilter(request, response)
