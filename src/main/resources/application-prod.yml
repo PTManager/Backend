@@ -14,8 +14,14 @@ spring:
       connection-timeout: 10000              # 풀 대기 최대 10초
       max-lifetime: 1800000                  # 커넥션 최대 수명 30분
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+    show-sql: false
     open-in-view: false
   flyway:
     enabled: true
@@ -24,3 +30,10 @@ spring:
   h2:
     console:
       enabled: false
+
+# 인증 401 원인 진단용 (확인 끝나면 제거 권장).
+# 요청마다 어떤 필터가 인증/인가를 어떻게 판정했는지 로그로 남는다.
+# 켜기: LOG_SECURITY=DEBUG (기본 INFO 라 평소엔 조용함)
+logging:
+  level:
+    org.springframework.security: ${LOG_SECURITY:INFO}
