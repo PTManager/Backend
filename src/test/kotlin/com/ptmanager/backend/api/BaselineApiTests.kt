@@ -539,6 +539,43 @@ class BaselineApiTests {
     }
 
     @Test
+    fun shiftOverlapRejectedAndDraftsHiddenUntilPublished() {
+        val (eToken, _) = signupReturning("pub-boss@ptmanager.test", "사장", "EMPLOYER")
+        val (wId, invite) = createWorkplace(eToken, "발행 테스트 매장")
+        val (empToken, empId) = signupReturning("pub-emp@ptmanager.test", "알바", "EMPLOYEE")
+        joinAndApprove(empToken, invite, eToken)
+
+        // 09-14 편성(초안), 겹치는 13-18 → 409, 맞닿는 14-18 → OK(경계는 겹침 아님)
+        createShift(eToken, wId, empId, "09:00:00", "14:00:00")
+        mockMvc.perform(
+            post("/api/shifts")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $eToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"workplaceId":$wId,"employeeId":$empId,"workDate":"2026-07-01","startTime":"13:00:00","endTime":"18:00:00"}"""),
+        ).andExpect(status().isConflict)
+        createShift(eToken, wId, empId, "14:00:00", "18:00:00")
+
+        // 발행 전: 직원에게는 초안이 보이지 않는다.
+        mockMvc.perform(
+            get("/api/shifts")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $empToken")
+                .param("employeeId", "me").param("from", "2026-07-01").param("to", "2026-07-01"),
+        ).andExpect(status().isOk).andExpect(jsonPath("$.length()", `is`(0)))
+
+        // 발행 → 2건, 직원에게 공개
+        mockMvc.perform(
+            post("/api/shifts/publish")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $eToken")
+                .param("workplaceId", wId.toString()).param("from", "2026-07-01").param("to", "2026-07-01"),
+        ).andExpect(status().isOk).andExpect(jsonPath("$.published", `is`(2)))
+        mockMvc.perform(
+            get("/api/shifts")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $empToken")
+                .param("employeeId", "me").param("from", "2026-07-01").param("to", "2026-07-01"),
+        ).andExpect(status().isOk).andExpect(jsonPath("$.length()", `is`(2)))
+    }
+
+    @Test
     fun cannotDeleteShiftWithPendingSwap() {
         // 직원이 shift 2 에 대타 요청(PENDING) 생성
         val empToken = loginAs("employee@ptmanager.test")

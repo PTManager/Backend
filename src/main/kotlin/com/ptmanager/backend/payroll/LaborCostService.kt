@@ -2,6 +2,7 @@ package com.ptmanager.backend.payroll
 
 import com.ptmanager.backend.common.access.WorkplaceAccessGuard
 import com.ptmanager.backend.domain.AttendanceStatus
+import com.ptmanager.backend.domain.UserRole
 import com.ptmanager.backend.payroll.dto.LaborCostReport
 import com.ptmanager.backend.payroll.dto.LaborCostReport.EmployeeCost
 import com.ptmanager.backend.payroll.dto.WeeklyPayrollSummary.WeeklyCost
@@ -38,6 +39,10 @@ class LaborCostService(
         for (shift in shifts) {
             val minutes = actualOrScheduledMinutes(shift)
             minutesByEmployee.merge(shift.employeeId, minutes) { a, b -> a + b }
+        }
+        // 근무 기록이 없는 직원도 0원으로 목록에 포함한다.
+        for (member in userRepository.findByWorkplaceIdAndRole(workplaceId, UserRole.EMPLOYEE)) {
+            minutesByEmployee.putIfAbsent(member.id!!, 0L)
         }
 
         val users = userRepository.findAllById(minutesByEmployee.keys).associateBy { it.id }

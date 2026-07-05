@@ -7,6 +7,7 @@ import com.ptmanager.backend.domain.AttendanceStatus
 import com.ptmanager.backend.domain.NotificationType
 import com.ptmanager.backend.domain.Shift
 import com.ptmanager.backend.domain.SwapRequestStatus
+import com.ptmanager.backend.domain.UserRole
 import com.ptmanager.backend.notification.NotificationService
 import com.ptmanager.backend.repository.ShiftRepository
 import com.ptmanager.backend.repository.SwapApplicationRepository
@@ -66,7 +67,9 @@ class ShiftService(
         val dateFiltered = base.filter {
             (from == null || !it.workDate.isBefore(from)) && (to == null || !it.workDate.isAfter(to))
         }
-        val shifts = if (status == null) dateFiltered else dateFiltered.filter { it.attendanceStatus == status }
+        val statusFiltered = if (status == null) dateFiltered else dateFiltered.filter { it.attendanceStatus == status }
+        // 초안(미발행) 근무는 사장에게만 보인다. 직원 등 그 외에게는 발행된 것만 노출.
+        val shifts = if (viewerIsEmployer()) statusFiltered else statusFiltered.filter { it.published }
 
         val names = userRepository.findAllById(shifts.map { it.employeeId }.distinct())
             .associate { it.id to it.name }
@@ -88,6 +91,8 @@ class ShiftService(
     ): ShiftResponse {
         accessGuard.requireMemberOf(workplaceId)
         requireEmployeeInWorkplace(employeeId, workplaceId)
+        requireNoOverlap(employeeId, workDate, startTime, endTime, excludeShiftId = null)
+        // 초안(published=false)으로 저장. 알림은 '발행' 시점에 한 번만 보낸다.
         val shift = shiftRepository.save(
             Shift(
                 workplaceId = workplaceId,
@@ -95,9 +100,9 @@ class ShiftService(
                 workDate = workDate,
                 startTime = startTime,
                 endTime = endTime,
+                published = false,
             ),
         )
-        notifyScheduleChanged(shift, "새 근무가 편성되었습니다.")
         return toResponse(shift, employeeNameOf(employeeId))
     }
 
@@ -117,9 +122,34 @@ class ShiftService(
         workDate?.let { shift.workDate = it }
         startTime?.let { shift.startTime = it }
         endTime?.let { shift.endTime = it }
+        requireNoOverlap(shift.employeeId, shift.workDate, shift.startTime, shift.endTime, excludeShiftId = shift.id)
         val saved = shiftRepository.save(shift)
-        notifyScheduleChanged(saved, "근무 편성이 변경되었습니다.")
+        // 초안 수정은 조용히, 이미 발행된 근무를 바꾼 경우에만 변경 알림.
+        if (saved.published) notifyScheduleChanged(saved, "근무 편성이 변경되었습니다.")
         return toResponse(saved, employeeNameOf(saved.employeeId))
+    }
+
+    /**
+     * 지정 주(from~to)의 초안 근무를 발행한다. 발행된 직원마다 알림을 1건만 보내 도배를 막는다.
+     * @return 발행된 근무 수
+     */
+    @Transactional
+    fun publish(workplaceId: Long, from: LocalDate, to: LocalDate): Int {
+        accessGuard.requireMemberOf(workplaceId)
+        val drafts = shiftRepository.findByWorkplaceIdAndWorkDateBetween(workplaceId, from, to)
+            .filter { !it.published }
+        drafts.forEach { it.published = true }
+        shiftRepository.saveAll(drafts)
+        drafts.map { it.employeeId }.distinct().forEach { employeeId ->
+            notificationService.notify(
+                employeeId,
+                NotificationType.SCHEDULE_CHANGED,
+                "새 근무표가 발행되었습니다.",
+                targetType = "SHIFT",
+                targetId = null,
+            )
+        }
+        return drafts.size
     }
 
     @Transactional
@@ -215,6 +245,30 @@ class ShiftService(
             .orNotFound("Shift not found.")
         accessGuard.requireMemberOf(shift.workplaceId)
         return shift
+    }
+
+    private fun viewerIsEmployer(): Boolean =
+        userRepository.findById(accessGuard.currentUserId()).orElse(null)?.role == UserRole.EMPLOYER
+
+    /**
+     * 같은 직원이 같은 날 이미 편성된 근무와 시간이 겹치면 409.
+     * ponytail: 같은 work_date 안에서만 검사한다. 자정 넘는 야간 교대(end<=start)는 비교에서 제외 —
+     * 필요해지면 scheduledEndInstant처럼 익일 보정 후 Instant 비교로 확장.
+     */
+    private fun requireNoOverlap(
+        employeeId: Long,
+        workDate: LocalDate,
+        start: LocalTime,
+        end: LocalTime,
+        excludeShiftId: Long?,
+    ) {
+        if (end <= start) return
+        val conflict = shiftRepository.findByEmployeeIdAndWorkDate(employeeId, workDate)
+            .filter { it.id != excludeShiftId && it.endTime > it.startTime }
+            .any { it.startTime < end && start < it.endTime }
+        if (conflict) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "이미 편성된 근무와 시간이 겹칩니다.")
+        }
     }
 
     private fun requireEmployeeInWorkplace(employeeId: Long, workplaceId: Long) {

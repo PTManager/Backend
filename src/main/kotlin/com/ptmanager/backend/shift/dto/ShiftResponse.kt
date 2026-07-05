@@ -18,6 +18,7 @@ data class ShiftResponse(
     val checkedInAt: Instant?,
     val checkedOutAt: Instant?,
     val attendanceStatus: AttendanceStatus,
+    val published: Boolean,
     val createdAt: Instant?,
     val updatedAt: Instant?,
 ) {
@@ -34,6 +35,7 @@ data class ShiftResponse(
             checkedInAt = shift.checkedInAt,
             checkedOutAt = shift.checkedOutAt,
             attendanceStatus = shift.attendanceStatus,
+            published = shift.published,
             createdAt = shift.createdAt,
             updatedAt = shift.updatedAt,
         )

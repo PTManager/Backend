@@ -43,6 +43,10 @@ class Shift(
     @Column(name = "checked_out_at")
     var checkedOutAt: Instant? = null,
 
+    // 편성 발행 상태. 신규 편성은 초안(false)으로 저장하고, 발행 시 직원에게 공개+알림한다.
+    @Column(name = "published", nullable = false)
+    var published: Boolean = false,
+
     @Enumerated(EnumType.STRING)
     @Column(name = "attendance_status", nullable = false, length = 16)
     var attendanceStatus: AttendanceStatus = AttendanceStatus.SCHEDULED,

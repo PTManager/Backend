@@ -9,6 +9,8 @@ interface ShiftRepository : JpaRepository<Shift, Long> {
 
     fun findByEmployeeIdOrderByWorkDateAscStartTimeAsc(employeeId: Long): List<Shift>
 
+    fun findByEmployeeIdAndWorkDate(employeeId: Long, workDate: LocalDate): List<Shift>
+
     fun findByAttendanceStatusAndWorkDateLessThanEqual(
         status: AttendanceStatus,
         workDate: LocalDate,

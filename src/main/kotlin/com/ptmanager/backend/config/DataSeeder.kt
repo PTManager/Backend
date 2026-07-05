@@ -112,6 +112,7 @@ class DataSeeder(
                     startTime = if (dayOffset == 0) start else LocalTime.of(14, 0),
                     endTime = if (dayOffset == 0) end else LocalTime.of(20, 0),
                     attendanceStatus = AttendanceStatus.SCHEDULED,
+                    published = true,
                 ),
             )
         }
@@ -144,6 +145,7 @@ class DataSeeder(
                     checkedInAt = checkedIn,
                     checkedOutAt = checkedOut,
                     attendanceStatus = status,
+                    published = true,
                 ),
             )
         }
@@ -205,6 +207,7 @@ class DataSeeder(
                 startTime = LocalTime.of(14, 0),
                 endTime = LocalTime.of(20, 0),
                 attendanceStatus = AttendanceStatus.SCHEDULED,
+                published = true,
             ),
         )
         val pending = swapRequestRepository.save(
@@ -237,6 +240,7 @@ class DataSeeder(
                 attendanceStatus = AttendanceStatus.PRESENT,
                 checkedInAt = today.minusDays(3).atTime(9, 1).atZone(zone).toInstant(),
                 checkedOutAt = today.minusDays(3).atTime(14, 0).atZone(zone).toInstant(),
+                published = true,
             ),
         )
         swapRequestRepository.save(

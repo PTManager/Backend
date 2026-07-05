@@ -57,6 +57,14 @@ class ShiftController(
             request.endTime,
         )
 
+    @PostMapping("/publish")
+    @PreAuthorize("hasRole('EMPLOYER')")
+    fun publish(
+        @RequestParam workplaceId: Long,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) from: LocalDate,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) to: LocalDate,
+    ): Map<String, Int> = mapOf("published" to shiftService.publish(workplaceId, from, to))
+
     @GetMapping("/{shiftId}")
     fun getShift(@PathVariable shiftId: Long): ShiftResponse = shiftService.getShiftDetail(shiftId)
 
