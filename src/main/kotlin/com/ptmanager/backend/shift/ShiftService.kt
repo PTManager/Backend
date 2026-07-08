@@ -13,6 +13,8 @@ import com.ptmanager.backend.repository.ShiftRepository
 import com.ptmanager.backend.repository.SwapApplicationRepository
 import com.ptmanager.backend.repository.SwapRequestRepository
 import com.ptmanager.backend.repository.UserRepository
+import com.ptmanager.backend.repository.WorkplaceRepository
+import java.time.Duration
 import com.ptmanager.backend.shift.dto.ShiftResponse
 import org.springframework.http.HttpStatus
 import org.springframework.scheduling.annotation.Scheduled
@@ -34,6 +36,7 @@ class ShiftService(
     private val notificationService: NotificationService,
     private val accessGuard: WorkplaceAccessGuard,
     private val qrCodeService: QrCodeService,
+    private val workplaceRepository: WorkplaceRepository,
 ) {
 
     fun findShifts(
@@ -78,7 +81,30 @@ class ShiftService(
 
     fun getShiftDetail(id: Long): ShiftResponse {
         val shift = getShift(id)
-        return toResponse(shift, employeeNameOf(shift.employeeId))
+        val base = toResponse(shift, employeeNameOf(shift.employeeId))
+        return base.copy(
+            workplaceName = workplaceRepository.findById(shift.workplaceId).orElse(null)?.name,
+            coworkers = coworkersOf(shift),
+            estimatedPay = estimatedPayOf(shift),
+        )
+    }
+
+    /** 같은 매장·같은 날짜의 다른 근무자 이름(중복 제거). 본인 제외. */
+    private fun coworkersOf(shift: Shift): List<String> =
+        shiftRepository.findByWorkplaceIdAndWorkDateBetween(shift.workplaceId, shift.workDate, shift.workDate)
+            .filter { it.id != shift.id && it.employeeId != shift.employeeId }
+            .mapNotNull { employeeNameOf(it.employeeId) }
+            .distinct()
+
+    /** 시급 × 근무시간(분). 야간 교대(end ≤ start)는 익일 종료로 보정. */
+    private fun estimatedPayOf(shift: Shift): Int? {
+        val wage = userRepository.findById(shift.employeeId).orElse(null)?.hourlyWage ?: return null
+        val endDate = if (shift.endTime <= shift.startTime) shift.workDate.plusDays(1) else shift.workDate
+        val minutes = Duration.between(
+            shift.workDate.atTime(shift.startTime),
+            endDate.atTime(shift.endTime),
+        ).toMinutes()
+        return (wage * minutes / 60).toInt()
     }
 
     @Transactional

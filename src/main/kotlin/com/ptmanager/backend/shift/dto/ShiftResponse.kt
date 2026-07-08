@@ -21,6 +21,10 @@ data class ShiftResponse(
     val published: Boolean,
     val createdAt: Instant?,
     val updatedAt: Instant?,
+    // 상세 조회(getShiftDetail)에서만 채운다. 목록 응답에서는 null.
+    val workplaceName: String? = null,
+    val coworkers: List<String>? = null,
+    val estimatedPay: Int? = null,
 ) {
     companion object {
         /** employeeName은 호출부가 조회해 넘긴다 (Shift에 없는 표시용 필드). */
