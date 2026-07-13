@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.time.LocalTime
-import java.util.NoSuchElementException
 
 @Service
 class SwapRequestService(
@@ -88,8 +87,7 @@ class SwapRequestService(
     }
 
     fun getDetail(id: Long): SwapRequestDetail {
-        val request = swapRequestRepository.findById(id)
-            .orNotFound("Swap request not found.")
+        val request = getRequest(id)
         accessGuard.requireMemberOf(request.workplaceId)
         val shift = shiftRepository.findById(request.shiftId).orElse(null)
         val applications = swapApplicationRepository.findBySwapRequestId(id)
@@ -108,8 +106,7 @@ class SwapRequestService(
     }
 
     fun listApplications(swapRequestId: Long): List<SwapApplicationResponse> {
-        val request = swapRequestRepository.findById(swapRequestId)
-            .orNotFound("Swap request not found.")
+        val request = getRequest(swapRequestId)
         accessGuard.requireMemberOf(request.workplaceId)
         return toApplicationResponses(swapApplicationRepository.findBySwapRequestId(swapRequestId))
     }
@@ -122,8 +119,7 @@ class SwapRequestService(
 
     @Transactional
     fun apply(swapRequestId: Long, applicantId: Long): SwapApplicationResponse {
-        val request = swapRequestRepository.findById(swapRequestId)
-            .orNotFound("Swap request not found.")
+        val request = getRequest(swapRequestId)
         if (request.requesterId == applicantId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인 요청에는 지원할 수 없습니다.")
         }
@@ -148,8 +144,7 @@ class SwapRequestService(
 
     @Transactional
     fun approve(swapRequestId: Long, applicantId: Long): SwapRequest {
-        val request = swapRequestRepository.findById(swapRequestId)
-            .orNotFound("Swap request not found.")
+        val request = getRequest(swapRequestId)
         accessGuard.requireMemberOf(request.workplaceId)
 
         val targetShift = shiftRepository.findById(request.shiftId)
@@ -168,8 +163,7 @@ class SwapRequestService(
             throw ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 대타 요청입니다.")
         }
         // markApproved가 영속성 컨텍스트를 clear 하므로 재조회한다.
-        val approved = swapRequestRepository.findById(swapRequestId)
-            .orNotFound("Swap request not found.")
+        val approved = getRequest(swapRequestId)
 
         val applications = swapApplicationRepository.findBySwapRequestId(swapRequestId)
         applications.forEach {
@@ -196,8 +190,7 @@ class SwapRequestService(
 
     @Transactional
     fun reject(id: Long): SwapRequest {
-        val request = swapRequestRepository.findById(id)
-            .orNotFound("Swap request not found.")
+        val request = getRequest(id)
         accessGuard.requireMemberOf(request.workplaceId)
 
         val updated = swapRequestRepository.markStatus(
@@ -206,8 +199,7 @@ class SwapRequestService(
         if (updated == 0) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 대타 요청입니다.")
         }
-        val rejected = swapRequestRepository.findById(id)
-            .orNotFound("Swap request not found.")
+        val rejected = getRequest(id)
         notificationService.notify(
             rejected.requesterId, NotificationType.SWAP_RESULT, "대타 요청이 거절되었습니다.",
             targetType = "SWAP_REQUEST", targetId = rejected.id,
@@ -245,6 +237,9 @@ class SwapRequestService(
         if (endMin <= startMin) endMin += 24 * 60 // 야간 교대: 익일로 보정
         return startMin to endMin
     }
+
+    private fun getRequest(id: Long): SwapRequest =
+        swapRequestRepository.findById(id).orNotFound("Swap request not found.")
 
     private fun toShiftResponse(shift: Shift): ShiftResponse =
         ShiftResponse.from(shift, userRepository.findById(shift.employeeId).orElse(null)?.name)
